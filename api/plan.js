@@ -1,4 +1,4 @@
-// 旅のしおりAI — プランを作るサーバー側の処理（Vercel のサーバーレス関数）
+// Wayleaf — プランを作るサーバー側の処理（Vercel のサーバーレス関数）
 // APIキーはブラウザに出さず、ここ（サーバー）だけで使います。
 
 // 上から順に試し、混んでいる・使えないモデルは飛ばして次へ
@@ -56,17 +56,36 @@ JSONだけで答えてください。形式:
 days は必ず ${n} 日分。ごはん以外の予定は1日あたり ${pace === "ぎっしり" ? "4〜6" : pace === "のんびり" ? "2〜3" : "3〜4"} 個。budget の最後は合計。`;
 }
 
+// 1回の呼び出しを待つ最長時間（Vercelの上限300秒より短く）
+const CALL_TIMEOUT = 150000;
+
+async function postGemini(model, prompt, key, thinking) {
+  const generationConfig = { responseMimeType: "application/json", temperature: 0.8 };
+  // 考える時間を短めにして速く返してもらう
+  if (thinking) generationConfig.thinkingConfig = { thinkingLevel: "low" };
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), CALL_TIMEOUT);
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig }),
+      signal: ctl.signal,
+    });
+    const data = await r.json().catch(() => ({}));
+    return { status: r.status, data };
+  } catch (e) {
+    return { status: 504, data: { error: { message: "timeout" } } };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callGemini(model, prompt, key) {
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.8 },
-    }),
-  });
-  const data = await r.json().catch(() => ({}));
-  return { status: r.status, data };
+  let out = await postGemini(model, prompt, key, true);
+  // このモデルが「考える時間」の設定に対応していなければ、設定なしでやり直す
+  if (out.status === 400 && /think/i.test(out.data?.error?.message || "")) out = await postGemini(model, prompt, key, false);
+  return out;
 }
 
 function parseJson(text) {
@@ -89,13 +108,13 @@ export default async function handler(req, res) {
     const started = Date.now();
     let status = 0, data = {}, busy = false;
     for (const model of MODELS) {
-      if (Date.now() - started > 25000) break; // 制限時間(60秒)に間に合わなくなるので打ち切り
+      if (Date.now() - started > 130000) break; // 次のモデルを試すと上限(300秒)に間に合わないので打ち切り
       ({ status, data } = await callGemini(model, prompt, key));
       if (status === 200) break;
       if (status === 401 || status === 403 || (status === 400 && /API key/i.test(data?.error?.message || ""))) {
         return res.status(500).json({ error: "APIキーが正しくないようです。Vercelに入れたキーを確認してね。" });
       }
-      if (status === 429 || status === 503 || /high demand|overloaded/i.test(data?.error?.message || "")) busy = true;
+      if (status === 429 || status === 503 || status === 504 || /high demand|overloaded/i.test(data?.error?.message || "")) busy = true;
       // 404(モデルなし)・429・500・503 などは次のモデルを試す
     }
     if (status !== 200 && busy) return res.status(503).json({ error: "今はAIがとても混み合っています。少し時間をおいて試してね。" });
