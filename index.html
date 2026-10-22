@@ -754,7 +754,13 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
     }
     return { text:"写真: Wikipedia", url:`https://${lang}.wikipedia.org/wiki/File:${encodeURIComponent(file)}` };
   }
-  function findPhoto(wiki, en, name, size=1100, strict=false){
+  // Wikipediaは決まった幅の写真しか用意していない（2000などを指定すると元の巨大な写真が返る）。
+  // 背景は画面の大きさに合わせて 1280 か 1920、カードは 800 を使う
+  function heroSize(){
+    const need = Math.max(innerWidth, innerHeight * 1.4) * Math.min(devicePixelRatio || 1, 2);
+    return need > 1400 ? 1920 : 1280;
+  }
+  function findPhoto(wiki, en, name, size=800, strict=false){
     const key = [wiki,en,name,size,strict].join("|");
     if (photoCache.has(key)) return photoCache.get(key);
     const job = (async () => {
@@ -790,7 +796,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
       el.dataset.done = "1";
       const {wiki="", en="", name=""} = el.dataset;
       const opt = el.classList.contains("opt");
-      limit(() => findPhoto(wiki, en, name, 1100, opt)).then(ph => {
+      limit(() => findPhoto(wiki, en, name, 800, opt)).then(ph => {
         if (!ph || !el.isConnected) { if (opt) el.hidden = true; return; }
         // 予定の写真は、同じ写真をプランの中で1回だけ使う（上にある予定を優先）
         if (opt){
@@ -817,7 +823,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
   let heroToken = 0;
   function setHero(wiki, en, name, onMiss, onShow){
     const token = ++heroToken, pin = $("#pin"), cr = $("#heroCredit");
-    findPhoto(wiki, en, name, 2000).then(ph => {
+    findPhoto(wiki, en, name, heroSize()).then(ph => {
       if (token !== heroToken) return;
       if (!ph) { if (onMiss) onMiss(); return; }
       const img = new Image();
