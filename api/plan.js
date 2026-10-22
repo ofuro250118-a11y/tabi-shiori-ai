@@ -1,5 +1,10 @@
 // Wayleaf — プランを作るサーバー側の処理（Vercel のサーバーレス関数）
 // APIキーはブラウザに出さず、ここ（サーバー）だけで使います。
+//
+// 速くするために、プランは2段階で作ります。
+//   mode:"outline" … 旅全体の骨組み（タイトル・見どころ・各日のエリアとスポット・予算など）
+//   mode:"day"     … 骨組みをもとに、1日分の細かい予定（時刻・お店）
+// 画面側は outline を作ったあと、各日の day を同時に呼びます。
 
 // 上から順に試し、混んでいる・使えないモデルは飛ばして次へ
 const MODELS = [
@@ -12,14 +17,12 @@ const MODELS = [
 
 const clip = (v, n) => String(v ?? "").slice(0, n).trim();
 
-function buildPrompt(b) {
+// ---------- 共通の条件 ----------
+function conditions(b) {
   const n = Math.min(Math.max(parseInt(b.days, 10) || 3, 1), 10);
   const pace = ["のんびり", "ふつう", "ぎっしり"].includes(b.pace) ? b.pace : "ふつう";
   const interests = Array.isArray(b.interests) ? b.interests.slice(0, 15).map(s => clip(s, 20)).join("、") : "";
-  return `あなたは、おしゃれでトレンドに詳しい日本語の旅行プランナーです。20代の女の子が「ここ行きたい！」と思えるような、具体的で現実的な旅行プランを作ってください。
-観光地・お店はすべて実在するものだけを使い、移動時間も考えて時刻を組んでください。費用は円で目安を書きます（海外でも円換算）。
-
-条件:
+  const text = `条件:
 - 行き先: ${clip(b.dest, 60)}
 - 日程: ${n === 1 ? "日帰り" : `${n - 1}泊${n}日`}（${n}日分）
 - 出発日: ${clip(b.start, 20) || "未定"}（季節やイベントがあれば反映）
@@ -28,36 +31,80 @@ function buildPrompt(b) {
 - 予算(1人あたり): ${clip(b.budget, 20)}
 - したいこと: ${interests || "おまかせ"}
 - ペース: ${pace}
-- その他: ${clip(b.notes, 400) || "なし"}
+- その他: ${clip(b.notes, 400) || "なし"}`;
+  const perDay = pace === "ぎっしり" ? "4〜6" : pace === "のんびり" ? "2〜3" : "3〜4";
+  return { n, pace, perDay, text };
+}
 
-写真のための名前:
+const INTRO = `あなたは、おしゃれでトレンドに詳しい日本語の旅行プランナーです。20代の女の子が「ここ行きたい！」と思えるような、具体的で現実的な旅行プランを作ります。
+観光地・お店はすべて実在するものだけを使ってください。費用は円で目安を書きます（海外でも円換算）。`;
+
+// ---------- 1. 骨組み ----------
+function outlinePrompt(b) {
+  const c = conditions(b);
+  return `${INTRO}
+
+${c.text}
+
+今回は旅全体の「骨組み」だけを作ってください（細かい時刻やお店は、あとで1日ずつ作ります）。
+- 各日に、まわるエリア(area)、その日の流れ(flow：1〜2文。初日は出発地から着く時間、最終日は帰る時間も意識する)、主な観光スポット(spots：実在の名前を ${c.perDay} 個)を割り当てる。
+- 日ごとにエリアを分けて、移動が少なくなるようにする。同じスポットを2日に入れない。
 - destWiki: 行き先の日本語版Wikipediaの記事名（例 "京都市"）。destEn: 英語名。
-- highlights: その行き先を代表する有名な場所・景色がきれいな場所を6つ。name は正式な名前、feature は見た目の特徴や魅力を1文、wiki は日本語版Wikipediaの記事名、en は英語名。
-- ごはん以外の予定(観光スポット・駅など)にも、あれば wiki(日本語版Wikipediaの記事名)を入れる。記事がなければ空文字。
-
-地図のための位置:
-- highlights・ごはん以外の予定・各お店(shop と alternatives)に lat, lng(その場所のおおよその緯度・経度の数値)を入れる。わからなければ null。
-
-ごはんのルール:
-- 各日のランチとディナーは必ず入れる（到着が遅い日・帰る日は時間に合う分だけ）。カフェやスイーツ休憩も1日1回くらい入れてよい。
-- ごはんの予定は type:"meal" にして、その時間・場所・予算・好みに一番合う実在のお店を shop に1つ、ほかの候補を alternatives に3つ入れる。
-- 各お店は name(正式な店名), genre, price(1人の目安 例 "¥1,500前後"), why(おすすめの理由を1文)。
+- highlights: 行き先を代表する有名な場所・景色がきれいな場所を6つ。name は正式な名前、feature は見た目の特徴や魅力を1文、wiki は日本語版Wikipediaの記事名、en は英語名、lat/lng はおおよその緯度経度（わからなければ null）。
 
 JSONだけで答えてください。形式:
 {"title":"旅のタイトル","summary":"2〜3文の概要","destWiki":"","destEn":"",
 "meta":[{"label":"出発","value":"..."},{"label":"人数","value":"..."},{"label":"ペース","value":"..."}],
 "highlights":[{"name":"","feature":"","wiki":"","en":"","lat":35.0,"lng":135.7}],
-"days":[{"label":"1日目","theme":"その日のテーマ","items":[
- {"time":"09:00","place":"場所名","wiki":"","lat":35.0,"lng":135.7,"activity":"何をするか1文","tip":"短いひとこと(なければ空文字)","cost":"¥1,000(なければ空文字)"},
- {"time":"12:00","type":"meal","meal":"ランチ","shop":{"name":"","genre":"","price":"","why":"","lat":35.0,"lng":135.7},"alternatives":[{"name":"","genre":"","price":"","why":"","lat":35.0,"lng":135.7}]}
-]}],
+"days":[{"label":"1日目","theme":"その日のテーマ","area":"","flow":"","spots":[""]}],
 "budget":[{"item":"交通","amount":"¥..."},{"item":"合計","amount":"約¥..."}],
 "tips":["旅のコツを3つ"],"packing":["持ち物を3〜5個"]}
-days は必ず ${n} 日分。ごはん以外の予定は1日あたり ${pace === "ぎっしり" ? "4〜6" : pace === "のんびり" ? "2〜3" : "3〜4"} 個。budget の最後は合計。`;
+days は必ず ${c.n} 日分。budget の最後は合計。`;
 }
 
+// ---------- 2. 1日分の細かい予定 ----------
+function slimOutline(o) {
+  const days = Array.isArray(o?.days) ? o.days.slice(0, 10) : [];
+  return {
+    title: clip(o?.title, 80),
+    days: days.map(d => ({
+      label: clip(d?.label, 20), theme: clip(d?.theme, 60), area: clip(d?.area, 60), flow: clip(d?.flow, 200),
+      spots: Array.isArray(d?.spots) ? d.spots.slice(0, 8).map(s => clip(s, 40)) : [],
+    })),
+  };
+}
+
+function dayPrompt(b, outline, i) {
+  const c = conditions(b);
+  const o = slimOutline(outline);
+  const d = o.days[i];
+  const isFirst = i === 0, isLast = i === o.days.length - 1;
+  return `${INTRO}
+
+${c.text}
+
+旅全体の骨組み（決まっていること）:
+${JSON.stringify(o)}
+
+このうち「${d.label}（${d.theme}）」の細かい予定を作ってください。
+- エリア「${d.area}」の、この日のスポット ${JSON.stringify(d.spots)} を中心に、移動時間も考えて時刻を組む。ほかの日のスポットは入れない。
+- この日の流れ: ${d.flow}${isFirst ? "\n- 初日なので、出発地から着く時間を考えて始める。" : ""}${isLast ? "\n- 最終日なので、帰りの時間を考えて終える。" : ""}
+- ごはん以外の予定は ${c.perDay} 個くらい。駅やホテルも予定に入れてよい。
+- ランチとディナーは必ず入れる（着く前・帰ったあとの分は除く）。カフェやスイーツ休憩も1回くらい入れてよい。
+- ごはんの予定は type:"meal" にして、その時間・場所・予算・好みに一番合う、この日のエリアの実在のお店を shop に1つ、ほかの候補を alternatives に3つ。各お店は name(正式な店名), genre, price(1人の目安 例 "¥1,500前後"), why(おすすめの理由を1文)。
+- ごはん以外の予定には、あれば wiki(日本語版Wikipediaの記事名、なければ空文字)を入れる。
+- すべての場所とお店に lat, lng(おおよその緯度・経度の数値、わからなければ null)を入れる。
+
+JSONだけで答えてください。形式:
+{"items":[
+ {"time":"09:00","place":"場所名","wiki":"","lat":35.0,"lng":135.7,"activity":"何をするか1文","tip":"短いひとこと(なければ空文字)","cost":"¥1,000(なければ空文字)"},
+ {"time":"12:00","type":"meal","meal":"ランチ","shop":{"name":"","genre":"","price":"","why":"","lat":35.0,"lng":135.7},"alternatives":[{"name":"","genre":"","price":"","why":"","lat":35.0,"lng":135.7}]}
+]}`;
+}
+
+// ---------- Gemini の呼び出し ----------
 // 1回の呼び出しを待つ最長時間（Vercelの上限300秒より短く）
-const CALL_TIMEOUT = 150000;
+const CALL_TIMEOUT = 120000;
 
 async function postGemini(model, prompt, key, thinking) {
   const generationConfig = { responseMimeType: "application/json", temperature: 0.8 };
@@ -95,6 +142,31 @@ function parseJson(text) {
   return null;
 }
 
+// 混んでいるモデルは飛ばしながら、JSONの答えをもらう
+async function generate(prompt, key, isValid) {
+  const started = Date.now();
+  let status = 0, data = {}, busy = false;
+  for (const model of MODELS) {
+    if (Date.now() - started > 150000) break; // 次のモデルを試すと上限(300秒)に間に合わないので打ち切り
+    ({ status, data } = await callGemini(model, prompt, key));
+    if (status === 200) {
+      const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
+      const json = parseJson(text);
+      if (json && isValid(json)) return { ok: true, json };
+      status = 502; data = { error: { message: "bad json" } };
+      continue; // 読めない答えなら次のモデルで
+    }
+    if (status === 401 || status === 403 || (status === 400 && /API key/i.test(data?.error?.message || ""))) {
+      return { ok: false, code: 500, body: { error: "APIキーが正しくないようです。Vercelに入れたキーを確認してね。" } };
+    }
+    if (status === 429 || status === 503 || status === 504 || /high demand|overloaded/i.test(data?.error?.message || "")) busy = true;
+  }
+  if (busy) return { ok: false, code: 503, body: { error: "今はAIがとても混み合っています。少し時間をおいて試してね。" } };
+  if (data?.error?.message === "bad json") return { ok: false, code: 502, body: { error: "AIの返事をうまく読み取れませんでした。もう一度試してね。" } };
+  return { ok: false, code: 502, body: { error: "AIの呼び出しに失敗しました。", detail: data?.error?.message } };
+}
+
+// ---------- 入口 ----------
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POSTで送ってください。" });
   const key = process.env.GEMINI_API_KEY;
@@ -103,27 +175,21 @@ export default async function handler(req, res) {
   const body = typeof req.body === "string" ? (parseJson(req.body) || {}) : (req.body || {});
   if (!clip(body.dest, 60)) return res.status(400).json({ error: "行き先を入れてね。" });
 
-  const prompt = buildPrompt(body);
   try {
-    const started = Date.now();
-    let status = 0, data = {}, busy = false;
-    for (const model of MODELS) {
-      if (Date.now() - started > 130000) break; // 次のモデルを試すと上限(300秒)に間に合わないので打ち切り
-      ({ status, data } = await callGemini(model, prompt, key));
-      if (status === 200) break;
-      if (status === 401 || status === 403 || (status === 400 && /API key/i.test(data?.error?.message || ""))) {
-        return res.status(500).json({ error: "APIキーが正しくないようです。Vercelに入れたキーを確認してね。" });
-      }
-      if (status === 429 || status === 503 || status === 504 || /high demand|overloaded/i.test(data?.error?.message || "")) busy = true;
-      // 404(モデルなし)・429・500・503 などは次のモデルを試す
+    if (body.mode === "day") {
+      const o = slimOutline(body.outline);
+      const i = parseInt(body.dayIndex, 10);
+      if (!o.days.length || !(i >= 0 && i < o.days.length)) return res.status(400).json({ error: "日にちの指定が正しくありません。" });
+      const r = await generate(dayPrompt(body, body.outline, i), key, j => Array.isArray(j.items));
+      return r.ok ? res.status(200).json({ items: r.json.items }) : res.status(r.code).json(r.body);
     }
-    if (status !== 200 && busy) return res.status(503).json({ error: "今はAIがとても混み合っています。少し時間をおいて試してね。" });
-    if (status !== 200) return res.status(502).json({ error: "AIの呼び出しに失敗しました。", detail: data?.error?.message });
-
-    const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
-    const plan = parseJson(text);
-    if (!plan || !Array.isArray(plan.days)) return res.status(502).json({ error: "AIの返事をうまく読み取れませんでした。もう一度試してね。" });
-    return res.status(200).json(plan);
+    // それ以外は骨組み
+    const { n } = conditions(body);
+    const r = await generate(outlinePrompt(body), key, j => Array.isArray(j.days) && j.days.length > 0);
+    if (!r.ok) return res.status(r.code).json(r.body);
+    const o = r.json;
+    o.days = o.days.slice(0, n);
+    return res.status(200).json(o);
   } catch (e) {
     return res.status(500).json({ error: "通信に失敗しました。もう一度試してね。" });
   }
