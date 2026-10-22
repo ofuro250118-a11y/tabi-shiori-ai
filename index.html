@@ -406,8 +406,15 @@ button:focus-visible,.chips label:focus-within span,a:focus-visible{outline:2px 
           interests:[...document.querySelectorAll("#interests input:checked")].map(i=>i.value)
         })
       });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok || !Array.isArray(data.days)) throw new Error(data.error || "プランを作れませんでした。もう一度試してね。");
+      const raw = await r.text();
+      let data = {}; try { data = JSON.parse(raw); } catch {}
+      if (!r.ok || !Array.isArray(data.days)) {
+        let msg = data.error;
+        if (!msg && r.status === 404) msg = "AIの部分（api/plan.js）が見つかりません。GitHubにapiフォルダが入っているか確認してね。";
+        if (!msg && (r.status === 504 || /TIMEOUT/i.test(raw))) msg = "AIの返事に時間がかかりすぎました。日数を短くするか、もう一度試してね。";
+        msg = (msg || "プランを作れませんでした。もう一度試してね。") + `（エラー番号 ${r.status}${data.detail ? "：" + data.detail : ""}）`;
+        throw new Error(msg);
+      }
       plan = data; planIsExample = false; dest = destVal; open.clear();
       render(true);
       window.scrollTo({top: $("#plan").offsetTop - 12, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
