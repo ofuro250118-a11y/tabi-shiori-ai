@@ -309,9 +309,11 @@ details.more-opts[open] summary::after{content:"−"}
       <details class="more-opts">
         <summary>こだわり条件</summary>
         <div class="opts">
+          <label class="f">性別<select id="gender"><option value="">指定なし</option><option>女性</option><option>男性</option><option>男女ミックス</option></select></label>
+          <label class="f">年代<select id="age"><option value="">指定なし</option><option>10代</option><option>20代</option><option>30代</option><option>40代</option><option>50代</option><option>60代以上</option></select></label>
+          <label class="f">ペース<select id="pace"><option>のんびり</option><option selected>ふつう</option><option>ぎっしり</option></select></label>
           <label class="f">出発日<input id="start" type="date"></label>
           <label class="f">出発地<input id="from" value="東京" placeholder="例：東京"></label>
-          <label class="f">ペース<select id="pace"><option>のんびり</option><option selected>ふつう</option><option>ぎっしり</option></select></label>
           <div class="full"><div class="legend">したいこと</div><div class="chips" id="interests"></div></div>
           <label class="f full">その他の希望<textarea id="notes" placeholder="例：朝は苦手。雑貨屋さんを見たい。雨の日の案も。"></textarea></label>
           <button class="go full" type="submit">この条件でプランを作る</button>
@@ -396,6 +398,8 @@ details.more-opts[open] summary::after{content:"−"}
   const DEFAULT_ON = ["グルメ","カフェ巡り","スイーツ","映えスポット"];
   $("#interests").innerHTML = INTERESTS.map((t,i)=>`<label><input type="checkbox" id="int${i}" value="${t}" ${DEFAULT_ON.includes(t)?"checked":""}><span>${t}</span></label>`).join("");
   const d = new Date(); d.setDate(d.getDate()+14); $("#start").value = d.toISOString().slice(0,10);
+  // 前回選んだ性別・年代を覚えておく
+  try { const w = JSON.parse(localStorage.getItem("tabi-shiori:who") || "null"); if (w) { $("#gender").value = w.gender || ""; $("#age").value = w.age || ""; } } catch {}
 
   // ---------- スクロールの動き ----------
   const root = document.documentElement, back = $("#back");
@@ -979,8 +983,10 @@ details.more-opts[open] summary::after{content:"−"}
     conds = {
       dest:destVal, days:$("#days").value, people:$("#people").value, start:$("#start").value,
       from:$("#from").value, budget:$("#budget").value, pace:$("#pace").value, notes:$("#notes").value,
+      gender:$("#gender").value, age:$("#age").value,
       interests:[...document.querySelectorAll("#interests input:checked")].map(i=>i.value)
     };
+    try { localStorage.setItem("tabi-shiori:who", JSON.stringify({gender:conds.gender, age:conds.age})); } catch {}
     try {
       const o = await postPlan({...conds, mode:"outline"});
       if (!Array.isArray(o.days) || !o.days.length) throw new Error("プランを作れませんでした。もう一度試してね。");
