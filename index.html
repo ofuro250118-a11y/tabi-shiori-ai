@@ -448,13 +448,18 @@ details.more-opts[open] summary::after{content:"−"}
   const api = (host, params) => fetch(`https://${host}/w/api.php?` + new URLSearchParams({format:"json",origin:"*",...params}))
     .then(r => r.ok ? r.json() : null).catch(() => null);
   const firstPage = j => { const p = j?.query?.pages; return p ? Object.values(p).sort((a,b)=>(a.index||0)-(b.index||0))[0] : null; };
-  const okFile = name => name && !/\.(svg|gif)$/i.test(name) && !/(logo|map|flag|emblem|symbol|地図|位置)/i.test(name);
+  const okFile = name => name && !/\.(svg|gif)$/i.test(name) && !/(logo|map|flag|emblem|symbol|地図|位置)/i.test(name) && okTopic(name);
+  // 事故・事件・災害などの暗い写真は使わない（記事名やファイル名にこれらの言葉があれば飛ばす）
+  const NG = /(事故|事件|墜落|衝突|火災|火事|災害|震災|地震|津波|洪水|噴火|爆発|爆破|テロ|襲撃|銃撃|殺人|殺害|犯罪|逮捕|暴動|戦争|戦闘|空襲|紛争|遭難|沈没|脱線|炎上|被害|死者|追悼|慰霊|葬|ハイジャック|便$|crash|accident|incident|disaster|wreck|collision|\bfire\b|wildfire|blaze|explosion|bomb|attack|shooting|terror|murder|killing|riot|\bwar\b|battle|earthquake|tsunami|flood|hurricane|tornado|hijack|derail|sinking|damage|debris|ruins of|memorial|funeral|victim|police|protest|flight \d)/i;
+  const okTopic = t => !NG.test(String(t || "").replace(/_/g, " "));
 
   async function fromWikipedia(lang, title, search, size){
     const base = {action:"query",redirects:"1",prop:"pageimages",piprop:"thumbnail|name",pithumbsize:String(size)};
-    const j = await api(`${lang}.wikipedia.org`, search ? {...base,generator:"search",gsrsearch:title,gsrlimit:"1"} : {...base,titles:title});
-    const p = firstPage(j);
-    if (!p || p.missing !== undefined || !p.thumbnail || !okFile(p.pageimage)) return null;
+    const j = await api(`${lang}.wikipedia.org`, search ? {...base,generator:"search",gsrsearch:title,gsrlimit:"5"} : {...base,titles:title});
+    const pages = j?.query?.pages ? Object.values(j.query.pages).sort((a,b)=>(a.index||0)-(b.index||0)) : [];
+    // 記事名も写真のファイル名も、明るい話題のものだけ使う
+    const p = pages.find(p => p.missing === undefined && p.thumbnail && okTopic(p.title) && okFile(p.pageimage));
+    if (!p) return null;
     return { src:p.thumbnail.source, file:p.pageimage, lang };
   }
   async function fromCommons(q, size){
@@ -551,6 +556,13 @@ details.more-opts[open] summary::after{content:"−"}
   const links = q => `<span class="links"><a class="lk" href="${photoUrl(q)}" target="_blank" rel="noopener">写真</a><a class="lk" href="${mapUrl(q)}" target="_blank" rel="noopener">地図</a></span>`;
   const shopBlock = s => `<p class="shop">${esc(s.name)}</p><p class="shopmeta">${esc([s.genre,s.price].filter(Boolean).join("・"))}${links(s.name)}</p>`;
 
+  // 予定の写真：AIが選んだ「photo」（ワクワクする景色の記事）を優先。空港・駅・ホテルで photo がなければ写真は出さない
+  const TRANSIT = /(空港|駅|ターミナル|ホテル|旅館|宿|チェックイン|チェックアウト|airport|station|terminal|hotel)/i;
+  function photoFor(it){
+    if (it.photo) return it.photo;
+    if (TRANSIT.test(it.place || "") || TRANSIT.test(it.wiki || "")) return "";
+    return it.wiki || "";
+  }
   function itemHTML(it, di, ii){
     const key = di+"-"+ii;
     let inner;
@@ -570,7 +582,7 @@ details.more-opts[open] summary::after{content:"−"}
       inner = `<div><span class="place">${esc(it.place)}</span>${it.cost?`<span class="cost">${esc(it.cost)}</span>`:""}${it.place?links(it.place):""}</div>
         ${it.activity?`<p class="act">${esc(it.activity)}</p>`:""}
         ${it.tip?`<p class="tip">ひとこと：${esc(it.tip)}</p>`:""}
-        ${it.wiki?phTag("opt",{wiki:it.wiki,name:it.place},di+ii):""}`;
+        ${photoFor(it) ? phTag("opt",{wiki:photoFor(it),name:it.place},di+ii) : ""}`;
     }
     return `<li class="stop-i"><span class="t">${esc(it.time)}</span><div class="body">${inner}</div></li>`;
   }
