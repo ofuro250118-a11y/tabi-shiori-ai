@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>旅のしおりAI</title>
+<meta name="description" content="行き先を入れるだけで、見どころの写真・日ごとの予定・ごはん屋さんまで入った旅行プランをAIが作ります。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Mono:wght@500&display=swap">
+<style>
+/* Layout: 白い紙のような旅雑誌。左に条件、右に「行き先の写真 → 見どころ写真カード → 日ごとの行程」。 */
+:root{
+  --bg:#FFFFFF; --soft:#F7F5F4; --card:#FFFFFF; --ink:#2B2A30; --muted:#7D7A82; --line:#ECE8E6;
+  --accent:#D9677A; --accent-soft:#FBEDEF; --sage:#7FA394; --sage-soft:#EEF4F1; --on-accent:#FFFFFF;
+  --f-display:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"DM Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#18171B; --soft:#211F24; --card:#211F24; --ink:#EFECEF; --muted:#A6A2AB; --line:#34313A;
+  --accent:#EE8FA0; --accent-soft:#3A2629; --sage:#93BBAB; --sage-soft:#22302B; --on-accent:#2A1418; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.75;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:max(30px,env(safe-area-inset-top,0px));padding-bottom:max(60px,env(safe-area-inset-bottom,0px))}
+img{max-width:100%;display:block}
+.wrap{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:330px 1fr;gap:32px;align-items:start}
+@media (max-width:840px){.wrap{grid-template-columns:1fr}}
+[hidden]{display:none!important}
+
+header.top{max-width:1100px;margin:0 auto 26px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px}
+.logo{font-family:var(--f-display);font-weight:700;font-size:clamp(26px,5vw,34px);margin:0;letter-spacing:.06em}
+.logo small{font-family:var(--f-body);font-size:12px;font-weight:700;letter-spacing:.2em;color:var(--accent);margin-left:8px;vertical-align:middle}
+.tag{font-size:13px;color:var(--muted);margin:0}
+
+form{background:var(--soft);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:14px;position:sticky;top:16px}
+@media (max-width:840px){form{position:static}}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:64px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+button:focus-visible,.chips label:focus-within span,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.legend{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips label{cursor:pointer}
+.chips input{position:absolute;opacity:0;width:1px;height:1px}
+.chips span{display:inline-block;padding:4px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:13px;color:var(--ink)}
+.chips input:checked + span{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.go{font:inherit;font-weight:700;font-size:15px;letter-spacing:.12em;border:0;border-radius:999px;padding:13px;background:var(--ink);color:var(--bg);cursor:pointer}
+.go:hover{background:var(--accent);color:var(--on-accent)}
+.go:disabled{opacity:.55;cursor:wait}
+.status{font-size:13px;color:var(--muted);min-height:1.2em}
+.status.err{color:var(--accent)}
+
+.plan{display:flex;flex-direction:column;gap:30px;min-width:0}
+/* 写真枠（読み込み前はやわらかい色） */
+.ph{position:relative;overflow:hidden;background:var(--g,var(--soft));border-radius:16px}
+.ph img{width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s}
+.ph img.on{opacity:1}
+.credit{position:absolute;right:8px;bottom:6px;z-index:2;font-size:10px;line-height:1.4;color:#fff;text-decoration:none;background:rgba(0,0,0,.38);border-radius:6px;padding:1px 6px;max-width:calc(100% - 16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.credit:hover{background:rgba(0,0,0,.6)}
+
+.hero{aspect-ratio:16/8;max-width:100%}
+@media (max-width:620px){.hero{aspect-ratio:4/3}}
+.cover{display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.22em;color:var(--accent);margin:0 0 6px}
+.cover h2{font-family:var(--f-display);font-weight:700;font-size:clamp(24px,4.2vw,34px);line-height:1.45;margin:0 0 10px;text-wrap:balance}
+.cover .sum{margin:0;max-width:60ch}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.meta span{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 12px}
+
+.secthead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+.secthead h3{font-family:var(--f-display);font-weight:700;font-size:20px;margin:0}
+.secthead span{font-size:12px;color:var(--muted)}
+.hl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+.hcard{display:flex;flex-direction:column;gap:8px;min-width:0}
+.hcard .ph{aspect-ratio:4/3;max-width:100%}
+.hcard h4{font-family:var(--f-display);font-weight:700;font-size:17px;margin:0;line-height:1.4}
+.hcard p{margin:0;font-size:14px;color:var(--ink)}
+
+.day{border-top:1px solid var(--line);padding-top:18px}
+.dayhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.dayno{font-family:var(--f-display);font-weight:700;font-size:22px;color:var(--accent)}
+.daytheme{font-weight:700;font-size:15px}
+.stops{list-style:none;margin:0;padding:0}
+.stop-i{display:grid;grid-template-columns:52px 1fr;gap:0 14px;padding:10px 0;position:relative}
+.stop-i::before{content:"";position:absolute;left:66px;top:28px;bottom:-10px;border-left:1px solid var(--line)}
+.stop-i:last-child::before{display:none}
+.t{font-family:var(--f-mono);font-size:13px;color:var(--muted);padding-top:3px;font-variant-numeric:tabular-nums}
+.body{min-width:0;padding-left:20px;position:relative}
+.body::before{content:"";position:absolute;left:-4px;top:9px;width:9px;height:9px;border-radius:50%;background:var(--bg);border:2px solid var(--accent)}
+.place{font-weight:700}
+.cost{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-left:8px;white-space:nowrap}
+.act{margin:0}
+.tip{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.body .ph{aspect-ratio:16/9;max-width:360px;margin-top:8px;border-radius:12px}
+.links{display:inline-flex;gap:6px;margin-left:8px;vertical-align:1px}
+.lk{font-size:11px;font-weight:700;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:1px 9px;white-space:nowrap}
+.lk:hover{color:var(--accent);border-color:var(--accent)}
+
+.meal{margin-top:2px;background:var(--soft);border-radius:14px;padding:12px 14px}
+.mealtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mealtag{font-size:11px;font-weight:700;letter-spacing:.1em;background:var(--accent);color:var(--on-accent);border-radius:999px;padding:1px 10px}
+.best{font-size:11px;font-weight:700;color:var(--accent)}
+.shop{font-weight:700;font-size:16px;margin:4px 0 0;line-height:1.45}
+.shopmeta{font-size:13px;color:var(--muted);margin:0}
+.why{margin:4px 0 0;font-size:14px}
+.more{margin-top:10px;font:inherit;font-weight:700;font-size:13px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:4px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.more:hover{border-color:var(--accent)}
+.more .arr{display:inline-block;transition:transform .2s}
+.more[aria-expanded="true"] .arr{transform:rotate(180deg)}
+.alts{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.alt{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:start}
+.alt .shop{font-size:15px;margin:0}
+.alt .why{grid-column:1/-1;margin:0}
+.pick{font:inherit;font-weight:700;font-size:12px;background:var(--sage-soft);color:var(--ink);border:1px solid var(--sage);border-radius:999px;padding:3px 11px;cursor:pointer;white-space:nowrap}
+
+.extras{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:620px){.extras{grid-template-columns:1fr}}
+.box{background:var(--soft);border-radius:16px;padding:18px 22px;min-width:0}
+.box h3{font-family:var(--f-display);font-weight:700;font-size:17px;margin:0 0 8px}
+.box ul{margin:0;padding-left:1.2em}
+.btable{width:100%;border-collapse:collapse;font-size:14px}
+.btable td{padding:6px 0;border-bottom:1px solid var(--line)}
+.btable td:last-child{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.btable tr.total td{font-weight:700;border-bottom:0;color:var(--accent);font-size:15px}
+.note{font-size:12px;color:var(--muted);margin:0;text-align:center}
+.loading > *{opacity:.4}
+@media (prefers-reduced-motion:no-preference){
+  .fade{animation:fd .5s ease both}
+  @keyframes fd{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+}
+@media (prefers-reduced-motion:reduce){.ph img{transition:none}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1 class="logo">旅のしおり<small>AI</small></h1>
+  <p class="tag">行き先を入れるだけで、見どころ・予定・ごはん屋さんまで。</p>
+</header>
+
+<div class="wrap">
+  <form id="f" autocomplete="off">
+    <label class="f">行き先<input id="dest" required value="京都" placeholder="例：京都、台北、ソウル"></label>
+    <div class="row">
+      <label class="f">日数<select id="days"></select></label>
+      <label class="f">人数<select id="people"><option>1人</option><option selected>2人</option><option>3人</option><option>4人</option><option>5人以上</option></select></label>
+    </div>
+    <div class="row">
+      <label class="f">出発日<input id="start" type="date"></label>
+      <label class="f">出発地<input id="from" value="東京" placeholder="例：東京"></label>
+    </div>
+    <label class="f">予算（1人あたり）<select id="budget">
+      <option>〜3万円</option><option selected>3〜6万円</option><option>6〜10万円</option><option>10〜20万円</option><option>20万円以上</option><option>特に決めない</option>
+    </select></label>
+    <div>
+      <div class="legend">したいこと</div>
+      <div class="chips" id="interests"></div>
+    </div>
+    <label class="f">ペース<select id="pace"><option>のんびり</option><option selected>ふつう</option><option>ぎっしり</option></select></label>
+    <label class="f">その他の希望<textarea id="notes" placeholder="例：朝は苦手。雑貨屋さんを見たい。雨の日の案も。">抹茶スイーツは絶対に食べたい。</textarea></label>
+    <button class="go" id="go" type="submit">プランを作る</button>
+    <div class="status" id="status" role="status"></div>
+  </form>
+
+  <main class="plan" id="plan"></main>
+</div>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const GRADS = ["linear-gradient(135deg,#E9A6B3,#F3D2C1)","linear-gradient(135deg,#9CC3B4,#D7E7C8)","linear-gradient(135deg,#A9B9DD,#E2D3EE)","linear-gradient(135deg,#E8B98A,#F4DFB8)","linear-gradient(135deg,#B7A3D6,#EBC6D6)","linear-gradient(135deg,#8FB8CF,#CFE4E0)"];
+
+  // ---------- 入力欄 ----------
+  const daySel = $("#days");
+  for (let i=1;i<=10;i++){ const o=document.createElement("option"); o.value=i; o.textContent = i===1?"日帰り":`${i-1}泊${i}日`; if(i===3)o.selected=true; daySel.append(o); }
+  const INTERESTS = ["グルメ","カフェ巡り","スイーツ","映えスポット","ショッピング","観光名所","自然・景色","温泉","アート","夜景","雑貨屋さん","ナイトライフ"];
+  const DEFAULT_ON = ["グルメ","カフェ巡り","スイーツ","映えスポット"];
+  $("#interests").innerHTML = INTERESTS.map((t,i)=>`<label><input type="checkbox" id="int${i}" value="${t}" ${DEFAULT_ON.includes(t)?"checked":""}><span>${t}</span></label>`).join("");
+  const d = new Date(); d.setDate(d.getDate()+14); $("#start").value = d.toISOString().slice(0,10);
+
+  // ---------- 写真（Wikipedia / Wikimedia Commons の自由に使える写真） ----------
+  const photoCache = new Map();
+  const strip = h => String(h||"").replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim();
+  const api = (host, params) => fetch(`https://${host}/w/api.php?` + new URLSearchParams({format:"json",origin:"*",...params}))
+    .then(r => r.ok ? r.json() : null).catch(() => null);
+  const firstPage = j => { const p = j?.query?.pages; return p ? Object.values(p).sort((a,b)=>(a.index||0)-(b.index||0))[0] : null; };
+  const okFile = name => name && !/\.(svg|gif)$/i.test(name) && !/(logo|map|flag|emblem|symbol|地図|位置)/i.test(name);
+
+  async function fromWikipedia(lang, title, search){
+    const base = {action:"query",redirects:"1",prop:"pageimages|info",inprop:"url",piprop:"thumbnail|name",pithumbsize:"1100"};
+    const j = await api(`${lang}.wikipedia.org`, search ? {...base,generator:"search",gsrsearch:title,gsrlimit:"1"} : {...base,titles:title});
+    const p = firstPage(j);
+    if (!p || p.missing !== undefined || !p.thumbnail || !okFile(p.pageimage)) return null;
+    return { src:p.thumbnail.source, file:p.pageimage, lang };
+  }
+  async function fromCommons(q){
+    const j = await api("commons.wikimedia.org", {action:"query",generator:"search",gsrsearch:q+" filetype:bitmap",gsrnamespace:"6",gsrlimit:"5",prop:"imageinfo",iiprop:"url|extmetadata",iiurlwidth:"1100"});
+    const pages = j?.query?.pages ? Object.values(j.query.pages).sort((a,b)=>(a.index||0)-(b.index||0)) : [];
+    for (const p of pages){
+      const name = p.title.replace(/^File:/,""), ii = p.imageinfo?.[0];
+      if (ii?.thumburl && okFile(name)) return { src:ii.thumburl, credit:creditFrom(ii) };
+    }
+    return null;
+  }
+  function creditFrom(ii){
+    const m = ii.extmetadata || {};
+    const artist = strip(m.Artist?.value) || "作者不明";
+    const lic = strip(m.LicenseShortName?.value) || "";
+    return { text:`写真: ${artist}${lic?" / "+lic:""}`, url: ii.descriptionurl };
+  }
+  async function creditFor(file, lang){
+    for (const host of ["commons.wikimedia.org", `${lang}.wikipedia.org`]){
+      const p = firstPage(await api(host, {action:"query",titles:"File:"+file,prop:"imageinfo",iiprop:"url|extmetadata"}));
+      if (p?.imageinfo?.[0]) return creditFrom(p.imageinfo[0]);
+    }
+    return { text:"写真: Wikipedia", url:`https://${lang}.wikipedia.org/wiki/File:${encodeURIComponent(file)}` };
+  }
+  function findPhoto(wiki, en, name){
+    const key = [wiki,en,name].join("|");
+    if (photoCache.has(key)) return photoCache.get(key);
+    const job = (async () => {
+      let hit = null;
+      if (wiki) hit = await fromWikipedia("ja", wiki, false) || await fromWikipedia("ja", wiki, true);
+      if (!hit && en) hit = await fromWikipedia("en", en, false) || await fromWikipedia("en", en, true);
+      if (!hit && name) hit = await fromWikipedia("ja", name, true);
+      if (hit) return { src:hit.src, credit: await creditFor(hit.file, hit.lang) };
+      return await fromCommons(en || wiki || name);
+    })().catch(() => null);
+    photoCache.set(key, job);
+    return job;
+  }
+  // 同時に取りに行く数を4つまでにする
+  let running = 0; const queue = [];
+  const limit = fn => new Promise(res => { queue.push(() => fn().then(res)); pump(); });
+  function pump(){ while (running < 4 && queue.length){ running++; queue.shift()().finally(() => { running--; pump(); }); } }
+
+  function loadPhotos(root){
+    root.querySelectorAll(".ph[data-q]:not([data-done])").forEach(el => {
+      el.dataset.done = "1";
+      const {wiki="", en="", name=""} = el.dataset;
+      limit(() => findPhoto(wiki, en, name)).then(ph => {
+        if (!ph || !el.isConnected) { if (el.classList.contains("opt")) el.hidden = true; return; }
+        const img = new Image();
+        img.alt = el.dataset.alt || name || wiki;
+        img.loading = "lazy"; img.decoding = "async"; img.referrerPolicy = "no-referrer";
+        img.onload = () => img.classList.add("on");
+        img.onerror = () => { if (el.classList.contains("opt")) el.hidden = true; };
+        img.src = ph.src;
+        el.append(img);
+        if (ph.credit){
+          const a = document.createElement("a");
+          a.className = "credit"; a.href = ph.credit.url; a.target = "_blank"; a.rel = "noopener";
+          a.textContent = ph.credit.text; el.append(a);
+        }
+      });
+    });
+  }
+  const phTag = (cls, {wiki="",en="",name="",alt=""}, i=0) =>
+    `<div class="ph ${cls}" style="--g:${GRADS[i%GRADS.length]}" data-q="1" data-wiki="${esc(wiki)}" data-en="${esc(en)}" data-name="${esc(name)}" data-alt="${esc(alt||name||wiki)}"></div>`;
+
+  // ---------- 表示 ----------
+  let plan = null, planIsExample = true, dest = "京都";
+  const open = new Set();
+  const mapUrl = q => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q + " " + dest);
+  const photoUrl = q => "https://www.google.com/search?tbm=isch&q=" + encodeURIComponent(dest + " " + q);
+  const links = q => `<span class="links"><a class="lk" href="${photoUrl(q)}" target="_blank" rel="noopener">写真</a><a class="lk" href="${mapUrl(q)}" target="_blank" rel="noopener">地図</a></span>`;
+  const shopBlock = s => `<p class="shop">${esc(s.name)}</p><p class="shopmeta">${esc([s.genre,s.price].filter(Boolean).join("・"))}${links(s.name)}</p>`;
+
+  function itemHTML(it, di, ii){
+    const key = di+"-"+ii;
+    let inner;
+    if (it.type === "meal" && it.shop){
+      const alts = Array.isArray(it.alternatives) ? it.alternatives : [];
+      const isOpen = open.has(key);
+      inner = `<div class="meal">
+          <div class="mealtop"><span class="mealtag">${esc(it.meal || "ごはん")}</span><span class="best">いちばんのおすすめ</span></div>
+          ${shopBlock(it.shop)}
+          ${it.shop.why?`<p class="why">${esc(it.shop.why)}</p>`:""}
+          ${alts.length?`<button class="more" type="button" data-k="${key}" aria-expanded="${isOpen}">ほかのおすすめ ${alts.length}件 <span class="arr">▾</span></button>`:""}
+          ${isOpen?`<ul class="alts">${alts.map((a,ai)=>`<li class="alt fade"><div>${shopBlock(a)}</div>
+              <button class="pick" type="button" data-k="${key}" data-a="${ai}">ここにする</button>
+              ${a.why?`<p class="why">${esc(a.why)}</p>`:""}</li>`).join("")}</ul>`:""}
+        </div>`;
+    } else {
+      inner = `<div><span class="place">${esc(it.place)}</span>${it.cost?`<span class="cost">${esc(it.cost)}</span>`:""}${it.place?links(it.place):""}</div>
+        ${it.activity?`<p class="act">${esc(it.activity)}</p>`:""}
+        ${it.tip?`<p class="tip">ひとこと：${esc(it.tip)}</p>`:""}
+        ${it.wiki?phTag("opt",{wiki:it.wiki,name:it.place},di+ii):""}`;
+    }
+    return `<li class="stop-i"><span class="t">${esc(it.time)}</span><div class="body">${inner}</div></li>`;
+  }
+
+  function render(animate){
+    const p = plan, a = animate ? " fade" : "";
+    const days = Array.isArray(p.days)?p.days:[], hl = Array.isArray(p.highlights)?p.highlights:[];
+    const budget = Array.isArray(p.budget)?p.budget:[], tips = Array.isArray(p.tips)?p.tips:[], pack = Array.isArray(p.packing)?p.packing:[];
+    $("#plan").innerHTML = `
+      <section class="cover${a}">
+        ${phTag("hero",{wiki:p.destWiki||dest,en:p.destEn,name:dest,alt:dest+"の風景"},2)}
+        <div>
+          <p class="eyebrow">${planIsExample?"見本プラン":"あなたのプラン"}</p>
+          <h2>${esc(p.title)}</h2>
+          <p class="sum">${esc(p.summary)}</p>
+          <div class="meta">${(p.meta||[]).map(m=>`<span>${esc(m.label)}：${esc(m.value)}</span>`).join("")}</div>
+        </div>
+      </section>
+      ${hl.length?`<section class="${a}">
+        <div class="secthead"><h3>${esc(dest)}の見どころ</h3><span>写真はWikipedia・Wikimedia Commonsより</span></div>
+        <div class="hl">${hl.map((h,i)=>`<article class="hcard">
+            ${phTag("",h,i)}
+            <h4>${esc(h.name)}</h4><p>${esc(h.feature)}</p>
+          </article>`).join("")}</div>
+      </section>`:""}
+      ${days.map((dy,di)=>`<section class="day${a}">
+          <div class="dayhead"><span class="dayno">${esc(dy.label||((di+1)+"日目"))}</span><span class="daytheme">${esc(dy.theme)}</span></div>
+          <ol class="stops">${(dy.items||[]).map((it,ii)=>itemHTML(it,di,ii)).join("")}</ol>
+        </section>`).join("")}
+      <div class="extras${a}">
+        ${budget.length?`<div class="box"><h3>予算のめやす（1人）</h3><table class="btable">${budget.map((b,i)=>`<tr class="${i===budget.length-1&&/合計/.test(b.item)?"total":""}"><td>${esc(b.item)}</td><td>${esc(b.amount)}</td></tr>`).join("")}</table></div>`:""}
+        <div class="box"><h3>旅のコツ</h3><ul>${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+          ${pack.length?`<h3 style="margin-top:14px">持ち物</h3><ul>${pack.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}</div>
+      </div>
+      <p class="note">お店の営業日・予約の有無は、行く前に地図やお店のページで確認してね。</p>`;
+    loadPhotos($("#plan"));
+  }
+
+  $("#plan").addEventListener("click", e => {
+    const more = e.target.closest(".more"), pick = e.target.closest(".pick");
+    if (!more && !pick) return;
+    const k = (more||pick).dataset.k;
+    if (more) open.has(k) ? open.delete(k) : open.add(k);
+    else {
+      const [di,ii] = k.split("-").map(Number), ai = Number(pick.dataset.a);
+      const it = plan.days[di].items[ii], chosen = it.alternatives[ai];
+      it.alternatives[ai] = it.shop; it.shop = chosen; open.delete(k);
+    }
+    render(false);
+    document.querySelector(`.more[data-k="${k}"]`)?.focus();
+  });
+
+  // ---------- 見本プラン ----------
+  const shop = (name,genre,price,why)=>({name,genre,price,why});
+  plan = {
+    title:"京都 2泊3日　抹茶とカフェでゆるっと古都さんぽ",
+    summary:"1日目は東山の坂道と祇園、2日目は朝の嵐山と宇治で抹茶三昧。最終日は朝イチの伏見稲荷で、人の少ない千本鳥居を撮って帰ります。",
+    destWiki:"京都市", destEn:"Kyoto",
+    meta:[{label:"出発",value:"東京"},{label:"人数",value:"2人"},{label:"ペース",value:"ふつう"}],
+    highlights:[
+      {name:"伏見稲荷大社",wiki:"伏見稲荷大社",en:"Fushimi Inari-taisha",feature:"朱色の鳥居がどこまでも続く千本鳥居。朝の光の中がいちばんきれい。"},
+      {name:"清水寺",wiki:"清水寺",en:"Kiyomizu-dera",feature:"崖の上に張り出した木造の舞台。秋の紅葉と夜のライトアップが有名。"},
+      {name:"嵐山",wiki:"嵐山 (京都府)",en:"Arashiyama",feature:"竹林の小径や渡月橋がある、川と山に囲まれたエリア。"},
+      {name:"八坂の塔（法観寺）",wiki:"法観寺",en:"Hōkan-ji",feature:"石畳の坂道の先に五重塔が見える、京都らしい写真が撮れる場所。"},
+      {name:"金閣寺",wiki:"鹿苑寺",en:"Kinkaku-ji",feature:"池に映る金色のお寺。晴れた日は特にまぶしい。"},
+      {name:"平等院鳳凰堂",wiki:"平等院",en:"Byōdō-in",feature:"10円玉の絵柄のお寺。池の前から見る姿が左右対称で美しい。"}],
+    days:[
+      {label:"1日目",theme:"東山の坂道をおさんぽ",items:[
+        {time:"10:30",place:"京都駅",activity:"新幹線で到着。ホテルに荷物を預けて身軽に。",tip:"駅のロッカーはお昼前に埋まりがち。"},
+        {time:"12:00",type:"meal",meal:"ランチ",shop:shop("イカリヤ食堂","洋食","¥1,500前後","レトロでかわいい店内。ふわとろオムライスが人気。"),
+          alternatives:[shop("ぎをん 権兵衛","うどん・丼","¥1,500前後","老舗の親子丼とけいらんうどん。"),shop("祇園 おくむら","フレンチ","¥3,500前後","町家でちょっと贅沢ランチ。"),shop("やよい 本店","ちりめん山椒・お茶漬け","¥1,500前後","軽めにすませたい日に。")]},
+        {time:"14:00",place:"清水寺 → 二年坂・三年坂",wiki:"清水寺",activity:"舞台から景色を見て、坂道で写真タイム。",tip:"歩きやすい靴で。",cost:"¥500"},
+        {time:"16:00",type:"meal",meal:"カフェ",shop:shop("茶寮都路里 祇園本店","抹茶パフェ","¥1,700前後","抹茶好きなら外せない定番パフェ。"),
+          alternatives:[shop("% ARABICA 京都 東山","コーヒー","¥600前後","八坂の塔の近くでラテを片手に。"),shop("ぎをん小森","甘味処","¥1,500前後","白川沿いの町家でわらび餅。")]},
+        {time:"19:00",type:"meal",meal:"ディナー",shop:shop("先斗町 ますだ","京料理・おばんざい","¥5,000前後","細い路地の雰囲気ごと楽しめるお店。"),
+          alternatives:[shop("焼肉 弘 先斗町店","焼肉","¥6,000前後","鴨川近くで京都牛の焼肉。"),shop("先斗町 魯ビン","創作和食","¥5,000前後","鴨川を眺めながらごはん。")]}]},
+      {label:"2日目",theme:"嵐山と宇治で抹茶づくし",items:[
+        {time:"08:30",place:"嵐山 竹林の小径",wiki:"嵐山 (京都府)",activity:"朝の静かな竹林をおさんぽ。",tip:"9時をすぎると一気に混みます。"},
+        {time:"11:30",type:"meal",meal:"ランチ",shop:shop("湯豆腐 嵯峨野","湯豆腐","¥4,000前後","嵐山らしいやさしいランチ。"),
+          alternatives:[shop("eX cafe 京都嵐山本店","和カフェ","¥1,500前後","七輪で焼くお団子が楽しい。"),shop("嵐山 よしむら","そば","¥1,800前後","渡月橋が見える窓際席。")]},
+        {time:"14:00",place:"宇治 平等院",wiki:"平等院",activity:"10円玉の鳳凰堂を実際に見る。",cost:"¥700"},
+        {time:"15:30",type:"meal",meal:"カフェ",shop:shop("中村藤吉本店","抹茶スイーツ","¥1,500前後","竹筒に入った生茶ゼリイが名物。"),
+          alternatives:[shop("伊藤久右衛門 宇治本店","抹茶パフェ・抹茶そば","¥1,500前後","お土産もまとめて買える。"),shop("通圓","お茶屋さん","¥1,000前後","宇治橋のたもとの老舗。")]},
+        {time:"19:00",type:"meal",meal:"ディナー",shop:shop("京都 錦わらい","お好み焼き・鉄板焼き","¥3,000前後","ワイワイ食べられて気軽。"),
+          alternatives:[shop("京都勝牛 先斗町本店","牛カツ","¥2,000前後","サクッと食べたい夜に。"),shop("麺屋 猪一","ラーメン","¥1,200前後","締めにしたい上品なだしのラーメン。")]}]},
+      {label:"3日目",theme:"朝の伏見稲荷から帰り道",items:[
+        {time:"07:30",place:"伏見稲荷大社",wiki:"伏見稲荷大社",activity:"千本鳥居を人の少ない時間に。",tip:"朝の光がいちばんきれい。"},
+        {time:"11:00",place:"京都駅",activity:"お土産を買って新幹線で帰る。",tip:"抹茶のお菓子は駅ナカでまとめ買い。",cost:"¥3,000"}]}],
+    budget:[{item:"交通（往復新幹線＋市内）",amount:"¥30,000"},{item:"宿泊（2泊）",amount:"¥18,000"},{item:"ごはん・カフェ",amount:"¥18,000"},{item:"拝観料・お土産",amount:"¥5,000"},{item:"合計",amount:"約¥71,000"}],
+    tips:["市内はバスより地下鉄＋徒歩が早いことが多い。","人気の寺社は朝イチが狙い目。","人気カフェは開店直後か夕方が空いてる。"],
+    packing:["歩きやすい靴","交通系ICカード","モバイルバッテリー","エコバッグ"]
+  };
+  render(true);
+
+  // ---------- プランを作る ----------
+  const status = (t, err) => { const s=$("#status"); s.textContent=t; s.classList.toggle("err",!!err); };
+  let busy = false;
+  $("#f").addEventListener("submit", async e => {
+    e.preventDefault();
+    if (busy) return;
+    const destVal = $("#dest").value.trim();
+    if (!destVal) { status("行き先を入れてね。", true); return; }
+    busy = true; $("#go").disabled = true; $("#plan").classList.add("loading");
+    status("見どころ・プラン・お店を考え中…（30秒〜1分ほど）");
+    try {
+      const r = await fetch("/api/plan", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          dest:destVal, days:$("#days").value, people:$("#people").value, start:$("#start").value,
+          from:$("#from").value, budget:$("#budget").value, pace:$("#pace").value, notes:$("#notes").value,
+          interests:[...document.querySelectorAll("#interests input:checked")].map(i=>i.value)
+        })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !Array.isArray(data.days)) throw new Error(data.error || "プランを作れませんでした。もう一度試してね。");
+      plan = data; planIsExample = false; dest = destVal; open.clear();
+      render(true);
+      window.scrollTo({top: $("#plan").offsetTop - 12, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+      status("できました。ごはんの「ほかのおすすめ」もタップしてみてね。");
+    } catch (err) {
+      status(err.message || "通信に失敗しました。もう一度試してね。", true);
+    } finally {
+      busy = false; $("#go").disabled = false; $("#plan").classList.remove("loading");
+    }
+  });
+})();
+</script>
+</body>
+</html>
