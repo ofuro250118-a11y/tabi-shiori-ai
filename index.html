@@ -4,12 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#12100E">
 <meta name="color-scheme" content="light dark">
 <title>Wayleaf</title>
 <meta name="application-name" content="Wayleaf">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23D9566F%22/%3E%3Cpath d=%22M9 23C9 14 15 8 24 8c0 9-6 15-15 15z%22 fill=%22%23fff%22/%3E%3Cpath d=%22M9 23l9-9%22 stroke=%22%23D9566F%22 stroke-width=%221.6%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23D8A75E%22/%3E%3Cstop offset=%221%22 stop-color=%22%239C6630%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22url(%23g)%22/%3E%3Cpath d=%22M9 23C9 14 15 8 24 8c0 9-6 15-15 15z%22 fill=%22%23fff%22/%3E%3Cpath d=%22M9.5 22.5l8.5-8.5%22 stroke=%22%23B07A3E%22 stroke-width=%221.6%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
 <meta name="description" content="Wayleaf（ウェイリーフ）｜行き先を入れるだけで、見どころの写真・日ごとの予定・ごはん屋さんまで入った旅行プランをAIが作ります。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 /* Wayleaf — Apple のデザインの考え方（emilkowalski/skills: apple-design・mobile-native・emil-design-eng）に沿ったスタイル
@@ -17,14 +20,15 @@
    その上を角の丸いプランのシートがせり上がって覆う。下にすりガラスのタブバー。 */
 :root{
   /* 色：Appleのシステムカラーに近い落ち着いたグレーと、ブランドの1色だけ */
-  --bg:#FFFFFF; --soft:#F2F2F7; --card:#FFFFFF;
-  --ink:#1D1D1F; --muted:#6E6E73; --faint:#AEAEB2;
-  --line:rgba(60,60,67,.14); --fill:rgba(118,118,128,.12); --fill-press:rgba(118,118,128,.2);
-  --accent:#D9566F; --accent-ink:#B8384F; --accent-tint:rgba(217,86,111,.12); --on-accent:#FFFFFF;
-  --danger:#D70015;
-  --ph-a:#ECEAE7; --ph-b:#E6E9EC; --ph-c:#EAE6EA;
-  --bar:rgba(249,249,251,.78); --bar-edge:rgba(0,0,0,.08);
-  --field:rgba(255,255,255,.96); --field-ink:#1D1D1F;
+  /* 真っ白がベース。グレーには少しだけ黄土色を混ぜて温かく。アクセントは黄土色（オークル）1色 */
+  --bg:#FFFFFF; --soft:#F7F3EE; --card:#FFFFFF;
+  --ink:#2A2420; --muted:#7A7066; --faint:#C2B8AC;
+  --line:rgba(110,85,55,.15); --fill:rgba(160,120,70,.09); --fill-press:rgba(160,120,70,.16);
+  --accent:#A06A30; --accent-ink:#8A5A26; --accent-tint:rgba(176,122,62,.13); --on-accent:#FFFFFF;
+  --danger:#C0392B;
+  --ph-a:#F0EAE2; --ph-b:#EDE6DC; --ph-c:#F2ECE5;
+  --bar:rgba(255,255,255,.82); --bar-edge:rgba(110,85,55,.12);
+  --field:rgba(255,255,255,.97); --field-ink:#2A2420;
   --glass:rgba(255,255,255,.16); --glass-line:rgba(255,255,255,.28);
   /* 文字：OSの文字（iPhoneならSF Pro＋ヒラギノ）を使う。字間・行間は大きさごとに変える */
   --f-sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,sans-serif;
@@ -35,14 +39,14 @@
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#000000; --soft:#1C1C1E; --card:#1C1C1E;
-  --ink:#F5F5F7; --muted:#98989D; --faint:#636366;
-  --line:rgba(84,84,88,.55); --fill:rgba(118,118,128,.24); --fill-press:rgba(118,118,128,.34);
-  --accent:#FF6B86; --accent-ink:#FF8FA3; --accent-tint:rgba(255,107,134,.18); --on-accent:#FFFFFF;
-  --danger:#FF453A;
-  --ph-a:#1E1E21; --ph-b:#1B1E22; --ph-c:#201D22;
-  --bar:rgba(22,22,24,.72); --bar-edge:rgba(255,255,255,.08);
-  --field:rgba(28,28,30,.92); --field-ink:#F5F5F7;
+  --bg:#12100E; --soft:#1F1B17; --card:#1F1B17;
+  --ink:#F3EEE8; --muted:#A89E93; --faint:#5E554C;
+  --line:rgba(255,235,210,.12); --fill:rgba(230,200,160,.11); --fill-press:rgba(230,200,160,.18);
+  --accent:#D9A566; --accent-ink:#E3B67E; --accent-tint:rgba(217,165,102,.18); --on-accent:#1E1408;
+  --danger:#FF6B5B;
+  --ph-a:#221E1A; --ph-b:#201C18; --ph-c:#24201B;
+  --bar:rgba(22,19,16,.78); --bar-edge:rgba(255,235,210,.08);
+  --field:rgba(31,27,23,.94); --field-ink:#F3EEE8;
   color-scheme:dark}}
 
 /* ---- スマホでアプリっぽく感じるための土台 ---- */
@@ -71,8 +75,17 @@ button,summary,.tab,.chip,.chips label,.lk,.btn,.go,.dcard,.back{-webkit-user-se
 
 /* ===== 固定される写真 ===== */
 .stage{position:relative}
-.pin{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;z-index:0;
-  background:linear-gradient(180deg,#141C30 0%,#33466B 46%,#B9897F 100%)}
+/* 写真が出る前の背景：iOS・macOSの壁紙のような、光がにじんだグラデーション（動かさない） */
+.pin{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;z-index:0;background-color:#5A4A3C;
+  background-image:
+    radial-gradient(60% 45% at 85% 14%, rgba(255,214,150,.95) 0%, rgba(255,214,150,0) 70%),
+    radial-gradient(55% 45% at 10% 12%, rgba(150,175,195,.85) 0%, rgba(150,175,195,0) 70%),
+    radial-gradient(65% 50% at 20% 80%, rgba(214,150,90,.9) 0%,  rgba(214,150,90,0) 70%),
+    radial-gradient(55% 45% at 88% 86%, rgba(196,120,96,.85) 0%, rgba(196,120,96,0) 70%),
+    radial-gradient(45% 35% at 52% 48%, rgba(240,205,160,.38) 0%, rgba(240,205,160,0) 70%),
+    linear-gradient(180deg,#66788C 0%,#9C7A57 52%,#6E4A33 100%)}
+.pin::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:160px 160px}
 .pin img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s var(--ease-out);
   transform:scale(calc(1.02 + var(--p) * .12));filter:brightness(calc(1 - var(--p) * .45));will-change:transform}
 .pin img.on{opacity:1}
@@ -85,8 +98,18 @@ button,summary,.tab,.chip,.chips label,.lk,.btn,.go,.dcard,.back{-webkit-user-se
   padding-top:max(16px,env(safe-area-inset-top,0px));padding-bottom:calc(20px + var(--tabh) + env(safe-area-inset-bottom,0px))}
 .brand{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1120px;width:100%;margin:0 auto;min-height:32px}
 .logo{font-family:var(--f-display);font-weight:600;font-size:1.25rem;letter-spacing:-.015em;margin:0;display:flex;align-items:center;gap:7px;text-shadow:0 1px 8px rgba(0,0,0,.2)}
-.logo svg{width:20px;height:20px;flex:none}
-.credit-hero{font-size:.6875rem;color:rgba(255,255,255,.78);text-decoration:none;max-width:50%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.logo svg{width:24px;height:24px;flex:none;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.heroinfo{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:0;max-width:60%}
+.credit-hero{font-size:.6875rem;color:rgba(255,255,255,.78);text-decoration:none;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 6px rgba(0,0,0,.4)}
+/* 背景の絶景がどこかを小さく。押すとそこを行き先に入れる */
+.scenic{font:inherit;display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid rgba(255,255,255,.28);cursor:pointer;
+  background:rgba(0,0,0,.22);-webkit-backdrop-filter:blur(14px) saturate(1.6);backdrop-filter:blur(14px) saturate(1.6);
+  color:#fff;border-radius:999px;padding:5px 12px 5px 9px;font-size:.8125rem;font-weight:600;
+  transition:transform 160ms var(--ease-out),background-color 160ms var(--ease-out)}
+.scenic span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scenic svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2}
+.scenic:active{transform:scale(.97)}
+@media (hover:hover) and (pointer:fine){.scenic:hover{background:rgba(0,0,0,.36)}}
 .herotext{max-width:1120px;width:100%;margin:auto auto 24px;
   opacity:calc(1 - var(--p) * 1.1);transform:translateY(calc(var(--p) * -50px))}
 .eyebrow-w{font-size:.875rem;font-weight:600;letter-spacing:.01em;margin:0 0 8px;opacity:.88}
@@ -258,7 +281,8 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 @media (max-width:720px){.lg{grid-template-columns:1fr 1fr}}
 .fmsg{margin:0;font-size:.875rem;font-weight:600;color:var(--muted);min-height:1.2em}
 .fmsg.err{color:var(--danger)}
-.fcard{background:var(--soft);border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.fcard{background:var(--soft);border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0;position:relative}
+.fcard .actions{border-top:2px dashed var(--line);padding-top:14px;margin-top:6px!important}
 .fcard h3{font-family:var(--f-display);font-weight:700;font-size:1.25rem;letter-spacing:-.01em;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .fcard h3 small{font-family:var(--f-sys);font-size:.875rem;color:var(--muted);font-weight:600;letter-spacing:0}
 .legrow{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:.9375rem;align-items:baseline}
@@ -324,7 +348,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 .mk.star{background:#fff;color:var(--c);border-color:var(--c);font-size:14px}
 .leaflet-popup-content{font-family:var(--f-sys);font-size:13px;line-height:1.6;margin:10px 14px}
 .leaflet-popup-content b{font-size:14px}
-.leaflet-popup-content a{color:#B8384F;font-weight:600}
+.leaflet-popup-content a{color:#8A5A26;font-weight:600}
 .plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .plist button{font:inherit;color:inherit;text-align:left;width:100%;background:none;border:0;border-bottom:1px solid var(--line);padding:12px 4px;cursor:pointer;display:grid;grid-template-columns:30px 54px 1fr;gap:10px;align-items:center;border-radius:0}
 .plist .num{width:26px;height:26px;border-radius:50%;background:var(--c);color:#fff;font:700 11px/26px var(--f-sys);text-align:center}
@@ -386,6 +410,54 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 @media (prefers-contrast:more) and (prefers-color-scheme:dark){
   :root{--line:rgba(255,255,255,.5);--muted:#D1D1D6}
 }
+
+/* ===== Wayleaf らしさ：空港の案内板・出発ボード・搭乗券・絵はがき・地図の等高線 ===== */
+:root{--f-sign:"Barlow Condensed","Arial Narrow","Helvetica Neue",var(--f-display);--f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --board:#2A2420;--board-ink:#F6EBDD;--mat:#FFFFFF}
+@media (prefers-color-scheme: dark){:root{--board:#0B0A09;--board-ink:#F3D9B1;--mat:#2A2520}}
+/* 案内板の文字：英語は細長い大文字、日本語はOSの文字のまま */
+.logo{font-family:var(--f-sign);font-weight:700;font-size:1.5rem;letter-spacing:.06em;text-transform:uppercase}
+.eyebrow-w,.eyebrow{font-family:var(--f-mono);font-size:.75rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase}
+.eyebrow{color:var(--accent-ink)}
+.pn-big{font-family:var(--f-sign);text-transform:uppercase;font-weight:700;letter-spacing:.005em;line-height:.88;font-size:clamp(64px,14.5vw,184px)}
+.pn-big.ja{font-family:var(--f-display);text-transform:none;letter-spacing:-.02em;line-height:1.08;font-size:clamp(52px,12vw,148px)}
+.coord{font-family:var(--f-mono);font-size:.8125rem;letter-spacing:.06em;margin:14px 0 0;display:flex;gap:10px;align-items:center;opacity:.92;text-shadow:0 1px 8px rgba(0,0,0,.3)}
+.coord::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:#FFD08A;box-shadow:0 0 0 4px rgba(255,208,138,.28)}
+/* 地図の等高線（写真が出たら写真の下に隠れる） */
+.topo{position:absolute;inset:-12%;pointer-events:none;opacity:.9;
+  background:
+    repeating-radial-gradient(ellipse 62% 46% at 74% 24%, rgba(255,255,255,0) 0 26px, rgba(255,255,255,.11) 26px 27.2px),
+    repeating-radial-gradient(ellipse 56% 42% at 14% 82%, rgba(255,255,255,0) 0 32px, rgba(255,255,255,.08) 32px 33.2px);
+  -webkit-mask-image:radial-gradient(120% 90% at 50% 40%,#000 40%,transparent 85%);mask-image:radial-gradient(120% 90% at 50% 40%,#000 40%,transparent 85%)}
+/* 時刻は出発ボードのパネル（真ん中にパタパタの継ぎ目） */
+.stop-i{grid-template-columns:56px 1fr}
+.stop-i::before{left:70px}
+.t{font-family:var(--f-mono);font-weight:500;font-size:.8125rem;letter-spacing:.02em;color:var(--board-ink);background-color:var(--board);
+  background-image:linear-gradient(transparent calc(50% - .5px),rgba(0,0,0,.45) calc(50% - .5px),rgba(0,0,0,.45) calc(50% + .5px),transparent calc(50% + .5px));
+  border-radius:6px;padding:3px 0;text-align:center;align-self:start;margin-top:1px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+/* DAY 01 の見出しと日付 */
+.dayno{font-family:var(--f-sign);text-transform:uppercase;font-weight:700;font-size:clamp(2.75rem,5vw,3.5rem);letter-spacing:.01em;line-height:.9}
+.dayno small{font-size:.42em;letter-spacing:.08em;margin-right:5px;color:var(--accent-ink);vertical-align:.95em}
+.daydate{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.06em;color:var(--muted);display:block;margin-top:8px}
+.daytheme{color:var(--ink);margin-top:6px}
+/* 見どころと行き先カードは、白いフチの絵はがき */
+.rail{padding:6px 4px 20px;margin:0 -4px}
+.hcard .ph,.dcard .ph{border:6px solid var(--mat);border-radius:12px;box-shadow:0 1px 2px rgba(60,40,20,.08),0 10px 28px rgba(60,40,20,.14)}
+.hcard .ph .nm{font-family:var(--f-display)}
+.dcard .nm{font-size:1.25rem}
+/* 搭乗券：切り取り線の両はしに半円の切り欠き */
+.fcard{padding:18px 20px;overflow:hidden}
+.fcard h3{font-size:1.375rem}
+.fcard .actions{position:relative;overflow:visible}
+.fcard .actions::before,.fcard .actions::after{content:"";position:absolute;top:-11px;width:20px;height:20px;border-radius:50%;background:var(--bg)}
+.fcard .actions::before{left:-30px}.fcard .actions::after{right:-30px}
+.legrow .no,.legrow .tm,.fchip span{font-family:var(--f-mono)}
+.legrow .no{font-size:.75rem;letter-spacing:.04em}
+/* 使い方の番号も案内板の数字に */
+.steps span{width:auto;height:auto;border-radius:0;background:none;font-family:var(--f-sign);font-weight:700;font-size:2.25rem;line-height:1;color:var(--accent-ink);margin-bottom:6px}
+/* 地図の番号ピン */
+.mk,.plist .num{font-family:var(--f-mono)}
+@media (prefers-contrast:more){.t{background-image:none}}
 </style>
 <script>document.documentElement.classList.add("js")</script>
 </head>
@@ -393,17 +465,21 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 
 <section class="view" id="v-home">
 <div class="stage">
-  <div class="pin" id="pin" aria-hidden="true"></div>
+  <div class="pin" id="pin" aria-hidden="true"><div class="topo"></div></div>
 
   <header class="hero gutter">
     <div class="brand">
-      <p class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20C4 10.5 10.5 4 20 4c0 9.5-6.5 16-16 16z" fill="#fff"/><path d="M4.5 19.5L13 11" stroke="#D9566F" stroke-width="1.6" stroke-linecap="round"/></svg>Wayleaf</p>
-      <a class="credit-hero" id="heroCredit" target="_blank" rel="noopener" hidden></a>
+      <p class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D8A75E"/><stop offset="1" stop-color="#9C6630"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M9 23C9 14 15 8 24 8c0 9-6 15-15 15z" fill="#fff"/><path d="M9.5 22.5l8.5-8.5" stroke="#B07A3E" stroke-width="1.6" stroke-linecap="round"/></svg>Wayleaf</p>
+      <div class="heroinfo">
+        <button class="scenic" id="scenic" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6.1-6.5-11.2A6.5 6.5 0 0 1 12 3.3a6.5 6.5 0 0 1 6.5 6.5C18.5 14.9 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.3"/></svg><span id="scenicName"></span></button>
+        <a class="credit-hero" id="heroCredit" target="_blank" rel="noopener" hidden></a>
+      </div>
     </div>
 
     <div class="herotext">
-      <p class="eyebrow-w" id="heroEyebrow">旅のしおりを作ろう</p>
+      <p class="eyebrow-w" id="heroEyebrow">Travel planner</p>
       <h1 class="place-name"><span class="pn-big" id="heroBig">Where to next?</span><span class="pn-small" id="heroSmall">次は、どこへ行こう。</span></h1>
+      <p class="coord" id="heroCoord" hidden></p>
       <p class="hero-title" id="heroTitle"></p>
     </div>
 
@@ -448,7 +524,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 <section class="view page gutter" id="v-search" hidden>
   <div class="pagewrap">
     <div>
-      <p class="eyebrow">次はどこへ行く？</p>
+      <p class="eyebrow">Explore</p>
       <h1 class="ptitle">探す</h1>
     </div>
     <form class="searchbox" id="sf" role="search">
@@ -468,7 +544,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 <section class="view page gutter" id="v-map" hidden>
   <div class="pagewrap">
     <div>
-      <p class="eyebrow">いまのプラン</p>
+      <p class="eyebrow">Route map</p>
       <h1 class="ptitle">マップ</h1>
       <p class="psub" id="mapTitle"></p>
     </div>
@@ -482,7 +558,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 <section class="view page gutter" id="v-flights" hidden>
   <div class="pagewrap">
     <div>
-      <p class="eyebrow">飛行機の時間に合わせて</p>
+      <p class="eyebrow">Flights</p>
       <h1 class="ptitle">航空券</h1>
       <p class="psub">航空券を登録すると、着いた時間から帰りの便まで、ぴったりのプランを作れます。時刻はそれぞれの空港の現地時間で入れてね。</p>
     </div>
@@ -519,7 +595,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 <section class="view page gutter" id="v-saved" hidden>
   <div class="pagewrap">
     <div>
-      <p class="eyebrow">あなたのしおり</p>
+      <p class="eyebrow">Saved trips</p>
       <h1 class="ptitle">保存</h1>
       <p class="psub">このブラウザに保存されます。</p>
     </div>
@@ -739,10 +815,11 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
 
   // 一番上の大きな写真（新しい写真が読み込めたらふわっと入れ替える）
   let heroToken = 0;
-  function setHero(wiki, en, name){
+  function setHero(wiki, en, name, onMiss, onShow){
     const token = ++heroToken, pin = $("#pin"), cr = $("#heroCredit");
     findPhoto(wiki, en, name, 2000).then(ph => {
-      if (token !== heroToken || !ph) return;
+      if (token !== heroToken) return;
+      if (!ph) { if (onMiss) onMiss(); return; }
       const img = new Image();
       img.alt = ""; img.decoding = "async"; img.referrerPolicy = "no-referrer";
       img.onload = () => {
@@ -752,10 +829,71 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
         requestAnimationFrame(() => img.classList.add("on"));
         setTimeout(() => old.forEach(o => o.remove()), 1000);
         if (ph.credit){ cr.textContent = ph.credit.text; cr.href = ph.credit.url; cr.hidden = false; } else cr.hidden = true;
+        if (onShow) onShow();
       };
+      img.onerror = () => { if (token === heroToken && onMiss) onMiss(); };
       img.src = ph.src;
     });
   }
+
+
+  // ---------- 最初の画面の背景：世界の絶景をランダムに ----------
+  // en は英語版Wikipediaの記事名（その記事のトップ写真を使う）
+  const SCENIC = [
+    {en:"Oia, Greece", ja:"サントリーニ島", place:"Oia, Santorini", country:"ギリシャ"},
+    {en:"Moraine Lake", ja:"バンフ", place:"Moraine Lake", country:"カナダ"},
+    {en:"Machu Picchu", ja:"マチュピチュ", place:"Machu Picchu", country:"ペルー"},
+    {en:"Mont-Saint-Michel", ja:"モン・サン＝ミシェル", place:"Mont-Saint-Michel", country:"フランス"},
+    {en:"Hallstatt", ja:"ハルシュタット", place:"Hallstatt", country:"オーストリア"},
+    {en:"Lake Bled", ja:"ブレッド湖", place:"Lake Bled", country:"スロベニア"},
+    {en:"Ha Long Bay", ja:"ハロン湾", place:"Ha Long Bay", country:"ベトナム"},
+    {en:"Positano", ja:"アマルフィ海岸", place:"Positano", country:"イタリア"},
+    {en:"Manarola", ja:"チンクエ・テッレ", place:"Manarola, Cinque Terre", country:"イタリア"},
+    {en:"Neuschwanstein Castle", ja:"ノイシュヴァンシュタイン城", place:"Neuschwanstein", country:"ドイツ"},
+    {en:"Matterhorn", ja:"ツェルマット", place:"Matterhorn", country:"スイス"},
+    {en:"Taj Mahal", ja:"アグラ", place:"Taj Mahal", country:"インド"},
+    {en:"Angkor Wat", ja:"シェムリアップ", place:"Angkor Wat", country:"カンボジア"},
+    {en:"Fushimi Inari-taisha", ja:"京都", place:"Fushimi Inari", country:"日本"},
+    {en:"Arakurayama Sengen Park", ja:"富士吉田", place:"Chureito Pagoda", country:"日本"},
+    {en:"Iguazu Falls", ja:"イグアスの滝", place:"Iguazu Falls", country:"アルゼンチン・ブラジル"},
+    {en:"Uluru", ja:"ウルル", place:"Uluru", country:"オーストラリア"},
+    {en:"Plitvice Lakes National Park", ja:"プリトヴィツェ湖群", place:"Plitvice Lakes", country:"クロアチア"},
+    {en:"Grand Canyon", ja:"グランドキャニオン", place:"Grand Canyon", country:"アメリカ"},
+    {en:"Golden Gate Bridge", ja:"サンフランシスコ", place:"Golden Gate Bridge", country:"アメリカ"},
+    {en:"Al-Khazneh", ja:"ペトラ", place:"Petra", country:"ヨルダン"},
+    {en:"Grand Canal (Venice)", ja:"ヴェネツィア", place:"Grand Canal, Venice", country:"イタリア"},
+    {en:"Reine", ja:"ロフォーテン諸島", place:"Reine, Lofoten", country:"ノルウェー"},
+    {en:"Salar de Uyuni", ja:"ウユニ塩湖", place:"Salar de Uyuni", country:"ボリビア"},
+    {en:"Kinkaku-ji", ja:"京都", place:"Kinkaku-ji", country:"日本"},
+    {en:"Gardens by the Bay", ja:"シンガポール", place:"Gardens by the Bay", country:"シンガポール"},
+  ];
+  let scenicNow = null;
+  function showScenic(tries = 0){
+    const btn = $("#scenic");
+    btn.hidden = true; $("#heroCredit").hidden = true;
+    if (tries > 3) return;  // 写真が取れなければグラデーションのまま
+    let last = ""; try { last = localStorage.getItem("tabi-shiori:scenic") || ""; } catch {}
+    const pool = SCENIC.filter(x => x.en !== last && x !== scenicNow);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    scenicNow = pick;
+    setHero("", pick.en, pick.place, () => showScenic(tries + 1), () => {
+      if (plan) return;  // もうプランが出ていたら出さない
+      $("#scenicName").textContent = `${pick.place} · ${pick.country}`;
+      btn.hidden = false;
+      try { localStorage.setItem("tabi-shiori:scenic", pick.en); } catch {}
+    });
+  }
+  // 写真の場所を押すと、そこを行き先に入れる
+  $("#scenic").addEventListener("click", () => {
+    if (!scenicNow) return;
+    $("#dest").value = scenicNow.ja;
+    $("#scenic").hidden = true;
+    $("#heroEyebrow").textContent = "Destination";
+    setHeroName("", scenicNow.ja);
+    $("#heroTitle").textContent = "日数や予算を決めて「プランを作る」を押してね";
+    setCoord(scenicNow.ja);
+    setTimeout(() => $("#days").focus({preventScroll:true}), 50);
+  });
 
   // ---------- 表示 ----------
   let plan = null, planIsExample = false, dest = "", savedId = null, mapDirty = true;
@@ -800,6 +938,26 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
   // 作りかけのまま保存・表示された日は「もう一度作る」を出す
   function fixLoading(p){ (p?.days || []).forEach(d => { if (d.loading){ d.loading = false; d.error = "この日の予定はまだできていません。"; } }); return p; }
   // 英語名があれば英語を大きく・日本語を小さく。なければ日本語を大きく。
+  // 行き先の緯度経度（Wikipediaの位置情報）を、案内板のように小さく出す
+  let coordToken = 0;
+  function setCoord(title){
+    const el = $("#heroCoord"), my = ++coordToken;
+    el.hidden = true;
+    if (!title) return;
+    wikiCoords(title).then(c => {
+      if (my !== coordToken || !c) return;
+      const f = (v, p, n) => `${Math.abs(v).toFixed(4)}° ${v >= 0 ? p : n}`;
+      el.textContent = `${f(c.lat, "N", "S")}　${f(c.lng, "E", "W")}`;
+      el.hidden = false;
+    }).catch(() => {});
+  }
+  // 何日目かの日付（航空券の到着日、なければ出発日から数える）
+  function dayDate(i){
+    const base = String(plan?.flight?.out?.arr || plan?.conds?.start || "").slice(0,10);
+    const m = base.match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return "";
+    const d = new Date(+m[1], +m[2]-1, +m[3] + i);
+    return `${d.getMonth()+1}/${d.getDate()} ${["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()]}`;
+  }
   function setHeroName(en, ja){
     const big = $("#heroBig"), small = $("#heroSmall");
     const useEn = !!(en && en.trim() && en.trim() !== (ja||"").trim());
@@ -827,15 +985,15 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
   function renderHero(){
     if (!plan){
       heroToken++;
-      $("#heroEyebrow").textContent = "旅のしおりを作ろう";
+      $("#heroEyebrow").textContent = "Travel planner"; setCoord("");
       $("#cue").firstChild.textContent = "スクロールして使い方を見る";
       setHeroName("Where to next?", "次は、どこへ行こう。");
       $("#heroTitle").textContent = "行き先を入れるだけで、見どころ・予定・ごはん屋さんまでAIがまとめます。";
-      $("#pin").querySelectorAll("img").forEach(i => { i.classList.remove("on"); setTimeout(() => i.remove(), 900); });
-      $("#heroCredit").hidden = true;
+      showScenic();
       return;
     }
-    $("#heroEyebrow").textContent = planIsExample ? "見本プラン" : "あなたのプラン";
+    $("#scenic").hidden = true;
+    $("#heroEyebrow").textContent = planIsExample ? "Sample trip" : "Your trip"; setCoord(plan.destWiki || dest);
     $("#cue").firstChild.textContent = "スクロールしてプランを見る";
     setHeroName(plan.destEn || "", dest);
     $("#heroTitle").textContent = plan.title || "";
@@ -847,12 +1005,12 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
     const rv = reveal ? " rv" : "", last = loadLast();
     $("#inner").innerHTML = `
       <section class="intro${rv}">
-        <p class="eyebrow">使い方</p>
+        <p class="eyebrow">How it works</p>
         <h2>3ステップで、旅のしおりができあがり</h2>
         <ol class="steps">
-          <li><span>1</span><b>行き先を決める</b>上の「どこ行く？」に入れるか、下の「探す」から人気の行き先を選ぶ。</li>
-          <li><span>2</span><b>条件を入れる</b>日数・人数・予算を選ぶ。「こだわり条件」でしたいことや希望も伝えられる。</li>
-          <li><span>3</span><b>プランを作る</b>見どころの写真、日ごとの予定、ごはん屋さんまで1分ほどでできあがり。</li>
+          <li><span>01</span><b>行き先を決める</b>上の「どこ行く？」に入れるか、下の「探す」から人気の行き先を選ぶ。</li>
+          <li><span>02</span><b>条件を入れる</b>日数・人数・予算を選ぶ。「こだわり条件」でしたいことや希望も伝えられる。</li>
+          <li><span>03</span><b>プランを作る</b>見どころの写真、日ごとの予定、ごはん屋さんまで1分ほどでできあがり。</li>
         </ol>
         <div class="actions">
           <a class="btn primary" href="#search">人気の行き先から探す</a>
@@ -868,7 +1026,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
     const budget = Array.isArray(p.budget)?p.budget:[], tips = Array.isArray(p.tips)?p.tips:[], pack = Array.isArray(p.packing)?p.packing:[];
     $("#inner").innerHTML = `
       <section class="intro${rv}">
-        <p class="eyebrow">${planIsExample?"見本プラン":"あなたのプラン"}</p>
+        <p class="eyebrow">${planIsExample?"Sample trip":"Your trip"}</p>
         <h2>${esc(p.title)}</h2>
         <p class="sum">${esc(p.summary)}</p>
         <div class="meta">${(p.meta||[]).map(m=>`<span>${esc(m.label)}：${esc(m.value)}</span>`).join("")}</div>
@@ -904,7 +1062,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
     else if (dy.error) body = `<div class="dayload err">${esc(dy.error)}<br><button class="btn" type="button" data-retry="${di}">この日をもう一度作る</button></div>`;
     else body = `<ol class="stops">${(dy.items||[]).map((it,ii)=>itemHTML(it,di,ii)).join("")}</ol>`;
     return `<section class="day${rv}" id="day-${di}">
-        <div class="dayhead"><span class="dayno">${esc(dy.label||((di+1)+"日目"))}</span><span class="daytheme">${esc(dy.theme)}</span></div>
+        <div class="dayhead"><span class="dayno"><small>Day</small>${String(di+1).padStart(2,"0")}</span>${dayDate(di) ? `<span class="daydate">${dayDate(di)}</span>` : ""}<span class="daytheme">${esc(dy.theme)}</span></div>
         <div style="min-width:0">${body}</div>
       </section>`;
   }
@@ -1065,7 +1223,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
     $("#dest").value = name;
     location.hash = "home";
     scrolls.home = 0; window.scrollTo(0,0);
-    $("#heroEyebrow").textContent = "行き先を決めました";
+    $("#heroEyebrow").textContent = "Destination"; setCoord(wiki || name); $("#scenic").hidden = true;
     setHeroName(city || en || "", name);
     $("#heroTitle").textContent = "日数や予算を決めて「プランを作る」を押してね";
     setHero(wiki, en, name);
@@ -1131,7 +1289,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
   });
 
   // ---------- マップ ----------
-  const DAYC = ["#D9677A","#4F9A80","#5F7FC6","#CF8434","#9372C6","#3E9BB3","#B5657F"];
+  const DAYC = ["#B07A3E","#3E8E7E","#C0603E","#5A7BB5","#8E6BB0","#B8961F","#6F8F3E"];
   const coordCache = new Map();
   const num = v => (typeof v === "number" || typeof v === "string") && v !== "" && isFinite(+v) ? +v : NaN;
   const okLL = (lat,lng) => isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
@@ -1325,7 +1483,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
     const n = tripDays(t); if (n) $("#days").value = String(n);
     showFlightChip();
     location.hash = "home"; scrolls.home = 0; window.scrollTo(0,0);
-    $("#heroEyebrow").textContent = "航空券からプランを作る";
+    $("#heroEyebrow").textContent = "From your flight"; setCoord(t.dest); $("#scenic").hidden = true;
     setHeroName("", t.dest);
     $("#heroTitle").textContent = "飛行機の時間に合わせて作ります。条件を確認して「プランを作る」を押してね";
     setHero(t.dest, "", t.dest);
@@ -1392,7 +1550,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
     const destVal = $("#dest").value.trim();
     if (!destVal) { status("行き先を入れてね。", true); return; }
     busy = true; runId++; $("#go").disabled = true; $("#go").textContent = "作成中…"; $("#plan").classList.add("loading");
-    setHeroName("", destVal); $("#heroTitle").textContent = ""; $("#heroEyebrow").textContent = "プランを作っています";
+    setHeroName("", destVal); $("#heroTitle").textContent = ""; $("#heroEyebrow").textContent = "Planning…"; setCoord(destVal); $("#scenic").hidden = true;
     setHero(destVal, "", destVal);
     status("旅の骨組みを考え中…（10〜20秒ほど）");
     const waits = [
@@ -1420,7 +1578,7 @@ details.more-opts[open] summary::after{transform:translateY(2px) rotate(-135deg)
       await loadDays(plan.days.map((_, i) => i));
     } catch (err) {
       status(err.message || "通信に失敗しました。もう一度試してね。", true);
-      $("#heroEyebrow").textContent = "プランを作れませんでした";
+      $("#heroEyebrow").textContent = "Try again";
       $("#heroTitle").textContent = "少し時間をおいて、もう一度「プランを作る」を押してね。";
     } finally {
       waits.forEach(clearTimeout);
