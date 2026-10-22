@@ -322,6 +322,7 @@ details.more-opts[open] summary::after{content:"−"}
           <label class="f">出発日<input id="start" type="date"></label>
           <label class="f">出発地<input id="from" value="東京" placeholder="例：東京"></label>
           <div class="full"><div class="legend">したいこと</div><div class="chips" id="interests"></div></div>
+          <label class="f full">泊まるホテル（決まっていれば）<input id="hotel" placeholder="例：ザ・ゲートホテル京都高瀬川　／　2つなら「1泊目：〇〇、2泊目：△△」"></label>
           <label class="f full">その他の希望<textarea id="notes" placeholder="例：朝は苦手。雑貨屋さんを見たい。雨の日の案も。"></textarea></label>
           <button class="go full" type="submit">この条件でプランを作る</button>
         </div>
@@ -462,6 +463,42 @@ details.more-opts[open] summary::after{content:"−"}
     if (!p) return null;
     return { src:p.thumbnail.source, file:p.pageimage, lang };
   }
+  // ---- Openverse：まずブラウザから直接、ダメならサイトの中継(/api/photo)から ----
+  let ovDirect = true;
+  async function openverse(q){
+    const qs = new URLSearchParams({q, page_size:"12", license_type:"commercial", mature:"false"});
+    if (ovDirect){
+      try {
+        const r = await fetch("https://api.openverse.org/v1/images/?" + qs);
+        if (r.ok) return (await r.json()).results || [];
+        if (r.status === 429) return [];
+      } catch { ovDirect = false; }
+    }
+    try {
+      const r = await fetch("/api/photo?" + new URLSearchParams({q}));
+      return r.ok ? ((await r.json()).results || []) : [];
+    } catch { return []; }
+  }
+  const norm = t => String(t || "").toLowerCase().normalize("NFKC").replace(/[\s\-_・,.'’()（）]/g, "");
+  // 名前の大事な単語（3文字以上）がすべてタイトルかタグに入っていれば「その場所の写真」とみなす
+  function matches(x, label){
+    const words = String(label || "").split(/[\s,\-・／/]+/).filter(w => w.length >= 3 && !/^(the|of|and|de|la|le)$/i.test(w));
+    if (!words.length) return false;
+    const hay = norm(x.title) + " " + (x.tags || []).map(t => norm(t.name)).join(" ");
+    return words.every(w => hay.includes(norm(w)));
+  }
+  async function fromOpenverse(en, ja){
+    for (const label of [en, ja].filter(Boolean)){
+      const list = await openverse(label);
+      const x = list.find(x => x.thumbnail && okTopic(x.title) && !(x.tags || []).some(t => !okTopic(t.name)) && matches(x, label));
+      if (x){
+        const lic = x.license ? `CC ${String(x.license).toUpperCase()} ${x.license_version || ""}`.trim() : "";
+        return { src:x.thumbnail, credit:{ text:`写真: ${x.creator || "作者不明"}${lic ? " / " + lic : ""}`, url:x.foreign_landing_url || "https://openverse.org" } };
+      }
+    }
+    return null;
+  }
+
   async function fromCommons(q, size){
     const j = await api("commons.wikimedia.org", {action:"query",generator:"search",gsrsearch:q+" filetype:bitmap",gsrnamespace:"6",gsrlimit:"5",prop:"imageinfo",iiprop:"url|extmetadata",iiurlwidth:String(size)});
     const pages = j?.query?.pages ? Object.values(j.query.pages).sort((a,b)=>(a.index||0)-(b.index||0)) : [];
@@ -484,11 +521,18 @@ details.more-opts[open] summary::after{content:"−"}
     }
     return { text:"写真: Wikipedia", url:`https://${lang}.wikipedia.org/wiki/File:${encodeURIComponent(file)}` };
   }
-  function findPhoto(wiki, en, name, size=1100){
-    const key = [wiki,en,name,size].join("|");
+  function findPhoto(wiki, en, name, size=1100, strict=false){
+    const key = [wiki,en,name,size,strict].join("|");
     if (photoCache.has(key)) return photoCache.get(key);
     const job = (async () => {
       let hit = null;
+      // strict：記事名ぴったりの写真だけ（検索で似た記事を探さない）
+      if (strict){
+        hit = wiki ? await fromWikipedia("ja", wiki, false, size) : null;
+        if (hit) return { src:hit.src, credit: await creditFor(hit.file, hit.lang) };
+        // Wikipediaになければ Openverse（Flickrなど）で、その場所の名前が写真のタイトルに入っているものだけ
+        return await fromOpenverse(en, name || wiki);
+      }
       if (wiki) hit = await fromWikipedia("ja", wiki, false, size) || await fromWikipedia("ja", wiki, true, size);
       if (!hit && en) hit = await fromWikipedia("en", en, false, size) || await fromWikipedia("en", en, true, size);
       if (!hit && name) hit = await fromWikipedia("ja", name, true, size);
@@ -512,8 +556,16 @@ details.more-opts[open] summary::after{content:"−"}
     scope.querySelectorAll(".ph[data-q]:not([data-done])").forEach(el => {
       el.dataset.done = "1";
       const {wiki="", en="", name=""} = el.dataset;
-      limit(() => findPhoto(wiki, en, name)).then(ph => {
-        if (!ph || !el.isConnected) { if (el.classList.contains("opt")) el.hidden = true; return; }
+      const opt = el.classList.contains("opt");
+      limit(() => findPhoto(wiki, en, name, 1100, opt)).then(ph => {
+        if (!ph || !el.isConnected) { if (opt) el.hidden = true; return; }
+        // 予定の写真は、同じ写真をプランの中で1回だけ使う（上にある予定を優先）
+        if (opt){
+          const same = [...document.querySelectorAll("#inner .ph.opt[data-src]")].filter(o => o !== el && o.dataset.src === ph.src && !o.hidden);
+          if (same.some(o => o.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) { el.hidden = true; return; }
+          same.forEach(o => { o.hidden = true; });
+          el.dataset.src = ph.src;
+        }
         const img = new Image();
         img.alt = el.dataset.alt || name || wiki;
         img.loading = "lazy"; img.decoding = "async"; img.referrerPolicy = "no-referrer";
@@ -556,12 +608,13 @@ details.more-opts[open] summary::after{content:"−"}
   const links = q => `<span class="links"><a class="lk" href="${photoUrl(q)}" target="_blank" rel="noopener">写真</a><a class="lk" href="${mapUrl(q)}" target="_blank" rel="noopener">地図</a></span>`;
   const shopBlock = s => `<p class="shop">${esc(s.name)}</p><p class="shopmeta">${esc([s.genre,s.price].filter(Boolean).join("・"))}${links(s.name)}</p>`;
 
-  // 予定の写真：AIが選んだ「photo」（ワクワクする景色の記事）を優先。空港・駅・ホテルで photo がなければ写真は出さない
-  const TRANSIT = /(空港|駅|ターミナル|ホテル|旅館|宿|チェックイン|チェックアウト|airport|station|terminal|hotel)/i;
+  // 予定の写真：その場所そのもののWikipedia記事(wiki)の写真だけ使う。なければ出さない。
+  // ホテル・チェックインなど、場所の写真にならない予定には出さない。
+  const NOPHOTO = /(ホテル|旅館|宿|チェックイン|チェックアウト|hotel|check-?in|check-?out)/i;
   function photoFor(it){
-    if (it.photo) return it.photo;
-    if (TRANSIT.test(it.place || "") || TRANSIT.test(it.wiki || "")) return "";
-    return it.wiki || "";
+    if (NOPHOTO.test(it.place || "") || NOPHOTO.test(it.activity || "")) return null;
+    if (!it.wiki && !it.en) return null;
+    return {wiki:it.wiki || "", en:it.en || "", name:it.place || ""};
   }
   function itemHTML(it, di, ii){
     const key = di+"-"+ii;
@@ -582,7 +635,7 @@ details.more-opts[open] summary::after{content:"−"}
       inner = `<div><span class="place">${esc(it.place)}</span>${it.cost?`<span class="cost">${esc(it.cost)}</span>`:""}${it.place?links(it.place):""}</div>
         ${it.activity?`<p class="act">${esc(it.activity)}</p>`:""}
         ${it.tip?`<p class="tip">ひとこと：${esc(it.tip)}</p>`:""}
-        ${photoFor(it) ? phTag("opt",{wiki:photoFor(it),name:it.place},di+ii) : ""}`;
+        ${photoFor(it) ? phTag("opt",photoFor(it),di+ii) : ""}`;
     }
     return `<li class="stop-i"><span class="t">${esc(it.time)}</span><div class="body">${inner}</div></li>`;
   }
@@ -1104,7 +1157,7 @@ details.more-opts[open] summary::after{content:"−"}
     conds = {
       dest:destVal, days:$("#days").value, people:$("#people").value, start:$("#start").value,
       from:$("#from").value, budget:$("#budget").value, pace:$("#pace").value, notes:$("#notes").value,
-      gender:$("#gender").value, age:$("#age").value,
+      gender:$("#gender").value, age:$("#age").value, hotel:$("#hotel").value,
       interests:[...document.querySelectorAll("#interests input:checked")].map(i=>i.value)
     };
     try { localStorage.setItem("tabi-shiori:who", JSON.stringify({gender:conds.gender, age:conds.age})); } catch {}
