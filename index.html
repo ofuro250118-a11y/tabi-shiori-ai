@@ -891,6 +891,10 @@ details.more-opts[open] summary::after{content:"−"}
     $("#heroPlace").textContent = destVal; $("#heroTitle").textContent = ""; $("#heroEyebrow").textContent = "プランを作っています";
     setHero(destVal, "", destVal);
     status("見どころ・プラン・お店を考え中…（30秒〜1分ほど）");
+    const waits = [
+      setTimeout(() => status("お店や移動時間を調べています…もう少し待ってね。"), 35000),
+      setTimeout(() => status("今日はAIが少し混んでいるみたい。あと少しでできあがります…"), 75000),
+      setTimeout(() => status("まだ考えています…長い日程だと2〜3分かかることがあります。"), 130000)];
     try {
       const r = await fetch("/api/plan", {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -921,6 +925,7 @@ details.more-opts[open] summary::after{content:"−"}
       $("#heroEyebrow").textContent = "プランを作れませんでした";
       $("#heroTitle").textContent = "少し時間をおいて、もう一度「プランを作る」を押してね。";
     } finally {
+      waits.forEach(clearTimeout);
       busy = false; $("#go").disabled = false; $("#go").textContent = "プランを作る"; $("#plan").classList.remove("loading");
     }
   });
