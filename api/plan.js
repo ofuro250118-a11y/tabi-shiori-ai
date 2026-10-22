@@ -21,6 +21,7 @@ const clip = (v, n) => String(v ?? "").slice(0, n).trim();
 function conditions(b) {
   const n = Math.min(Math.max(parseInt(b.days, 10) || 3, 1), 10);
   const pace = ["のんびり", "ふつう", "ぎっしり"].includes(b.pace) ? b.pace : "ふつう";
+  const hotel = clip(b.hotel, 120);
   const gender = GENDERS.includes(b.gender) ? b.gender : "";
   const age = AGES.includes(b.age) ? b.age : "";
   const interests = Array.isArray(b.interests) ? b.interests.slice(0, 15).map(s => clip(s, 20)).join("、") : "";
@@ -35,7 +36,13 @@ function conditions(b) {
 - 予算(1人あたり): ${clip(b.budget, 20)}
 - したいこと: ${interests || "おまかせ"}
 - ペース: ${pace}
-- その他: ${clip(b.notes, 400) || "なし"}`;
+- 泊まるホテル: ${hotel || "未定（おまかせ）"}
+- その他: ${clip(b.notes, 400) || "なし"}${hotel ? `
+
+ホテルについて:
+- 泊まるホテルは「${hotel}」に決まっている。ここを拠点にする。
+- 朝はホテルから出発し、夜はホテルに戻る流れで組む。ホテルからの移動時間も考え、ホテルから行きやすいエリア・お店を優先する。
+- 初日はホテルにチェックイン（または荷物を預ける）、最終日はチェックアウトを予定に入れる。` : ""}`;
   const perDay = pace === "ぎっしり" ? "4〜6" : pace === "のんびり" ? "2〜3" : "3〜4";
   return { n, pace, perDay, text, gender, age };
 }
@@ -108,15 +115,14 @@ ${JSON.stringify(o)}
 - ごはん以外の予定は ${c.perDay} 個くらい。駅やホテルも予定に入れてよい。
 - ランチとディナーは必ず入れる（着く前・帰ったあとの分は除く）。カフェやスイーツ休憩も1回くらい入れてよい。
 - ごはんの予定は type:"meal" にして、その時間・場所・予算・好みに一番合う、この日のエリアの実在のお店を shop に1つ、ほかの候補を alternatives に3つ。各お店は name(正式な店名), genre, price(1人の目安 例 "¥1,500前後"), why(おすすめの理由を1文)。
-- ごはん以外の予定には、あれば wiki(その場所の日本語版Wikipediaの記事名、なければ空文字)を入れる。
-- ごはん以外の予定には photo も入れる。photo は、その予定の写真として見せる日本語版Wikipediaの記事名で、見た人がワクワクする明るくきれいな景色や建物の記事にする。
-  空港・駅・ホテルなど移動や宿の予定では、その街に着いたときにワクワクするような、その街を代表する景色の記事にする（例：ロサンゼルスなら「サンタモニカ・ピア」、京都なら「八坂の塔」）。
-  事故・事件・災害・戦争・犯罪に関する記事は絶対に使わない。
+- ごはん以外の予定には wiki を入れる。wiki は「その場所そのもの」の日本語版Wikipediaの記事名（例：清水寺、サンタモニカ・ピア）。
+  その場所の記事がない場合（ホテル・小さなお店・エリア全体など）は空文字にする。街や地域の記事、近くの別の名所の記事で代用しない。
+- ごはん以外の予定には en（その場所の英語での正式な名前、例 "Santa Monica Pier"、"Kiyomizu-dera"）も入れる。
 - すべての場所とお店に lat, lng(おおよその緯度・経度の数値、わからなければ null)を入れる。
 
 JSONだけで答えてください。形式:
 {"items":[
- {"time":"09:00","place":"場所名","wiki":"","photo":"","lat":35.0,"lng":135.7,"activity":"何をするか1文","tip":"短いひとこと(なければ空文字)","cost":"¥1,000(なければ空文字)"},
+ {"time":"09:00","place":"場所名","wiki":"","en":"","lat":35.0,"lng":135.7,"activity":"何をするか1文","tip":"短いひとこと(なければ空文字)","cost":"¥1,000(なければ空文字)"},
  {"time":"12:00","type":"meal","meal":"ランチ","shop":{"name":"","genre":"","price":"","why":"","lat":35.0,"lng":135.7},"alternatives":[{"name":"","genre":"","price":"","why":"","lat":35.0,"lng":135.7}]}
 ]}`;
 }
