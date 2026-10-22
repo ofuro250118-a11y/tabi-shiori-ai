@@ -1,8 +1,14 @@
 // 旅のしおりAI — プランを作るサーバー側の処理（Vercel のサーバーレス関数）
 // APIキーはブラウザに出さず、ここ（サーバー）だけで使います。
 
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
-const FALLBACK_MODEL = "gemini-flash-latest";
+// 上から順に試し、混んでいる・使えないモデルは飛ばして次へ
+const MODELS = [
+  process.env.GEMINI_MODEL,
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-flash-latest",
+  "gemini-3.5-flash-lite",
+].filter((m, i, a) => m && a.indexOf(m) === i);
 
 const clip = (v, n) => String(v ?? "").slice(0, n).trim();
 
@@ -77,9 +83,19 @@ export default async function handler(req, res) {
 
   const prompt = buildPrompt(body);
   try {
-    let { status, data } = await callGemini(DEFAULT_MODEL, prompt, key);
-    if (status === 404) ({ status, data } = await callGemini(FALLBACK_MODEL, prompt, key));
-    if (status === 429) return res.status(429).json({ error: "今はAIが混み合っています。少し時間をおいて試してね。" });
+    const started = Date.now();
+    let status = 0, data = {}, busy = false;
+    for (const model of MODELS) {
+      if (Date.now() - started > 25000) break; // 制限時間(60秒)に間に合わなくなるので打ち切り
+      ({ status, data } = await callGemini(model, prompt, key));
+      if (status === 200) break;
+      if (status === 401 || status === 403 || (status === 400 && /API key/i.test(data?.error?.message || ""))) {
+        return res.status(500).json({ error: "APIキーが正しくないようです。Vercelに入れたキーを確認してね。" });
+      }
+      if (status === 429 || status === 503 || /high demand|overloaded/i.test(data?.error?.message || "")) busy = true;
+      // 404(モデルなし)・429・500・503 などは次のモデルを試す
+    }
+    if (status !== 200 && busy) return res.status(503).json({ error: "今はAIがとても混み合っています。少し時間をおいて試してね。" });
     if (status !== 200) return res.status(502).json({ error: "AIの呼び出しに失敗しました。", detail: data?.error?.message });
 
     const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
