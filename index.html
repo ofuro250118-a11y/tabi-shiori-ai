@@ -352,6 +352,10 @@ details.more-opts[open] summary::after{content:"−"}
     </form>
     <h2 class="sub">人気の行き先</h2>
     <div class="dgrid" id="dgrid"></div>
+    <h2 class="sub" style="margin-top:22px">エリアから探す</h2>
+    <div class="chiprow" id="regionChips" aria-label="エリア" style="flex-wrap:wrap;overflow:visible"></div>
+    <p class="psub" id="regionLead"></p>
+    <div class="dgrid" id="rgrid"></div>
   </div>
 </section>
 
@@ -722,7 +726,7 @@ details.more-opts[open] summary::after{content:"−"}
     document.querySelectorAll(".tab").forEach(t => t.dataset.v === name ? t.setAttribute("aria-current","page") : t.removeAttribute("aria-current"));
     current = name;
     window.scrollTo(0, scrolls[name] || 0);
-    if (name === "home") onScroll();
+    if (name === "home") { onScroll(); fitHeroName(); }
     if (name === "search") renderSearch();
     if (name === "saved") renderSaved();
     if (name === "map") showMap();
@@ -732,40 +736,113 @@ details.more-opts[open] summary::after{content:"−"}
   // ---------- 探す ----------
   const POPULAR = [
     {name:"京都",wiki:"京都市",en:"Kyoto",catch:"古都さんぽと抹茶スイーツ"},
-    {name:"沖縄",wiki:"古宇利島",en:"Kouri Island",catch:"青い海と島ドライブ"},
-    {name:"金沢",wiki:"兼六園",en:"Kenroku-en",catch:"庭園と金箔ソフト"},
+    {name:"沖縄",wiki:"古宇利島",en:"Kouri Island",catch:"青い海と島ドライブ",city:"Okinawa"},
+    {name:"金沢",wiki:"兼六園",en:"Kenroku-en",catch:"庭園と金箔ソフト",city:"Kanazawa"},
     {name:"札幌",wiki:"札幌市",en:"Sapporo",catch:"スープカレーと夜景"},
     {name:"福岡",wiki:"福岡市",en:"Fukuoka",catch:"屋台ともつ鍋"},
-    {name:"箱根",wiki:"芦ノ湖",en:"Lake Ashi",catch:"温泉と湖の景色"},
+    {name:"箱根",wiki:"芦ノ湖",en:"Lake Ashi",catch:"温泉と湖の景色",city:"Hakone"},
     {name:"ソウル",wiki:"ソウル特別市",en:"Seoul",catch:"カフェと韓国コスメ"},
-    {name:"釜山",wiki:"甘川文化村",en:"Gamcheon Culture Village",catch:"カラフルな町と海"},
+    {name:"釜山",wiki:"甘川文化村",en:"Gamcheon Culture Village",catch:"カラフルな町と海",city:"Busan"},
     {name:"台北",wiki:"台北市",en:"Taipei",catch:"夜市と小籠包"},
     {name:"バンコク",wiki:"バンコク",en:"Bangkok",catch:"寺院とナイトマーケット"},
-    {name:"ホノルル",wiki:"ワイキキ",en:"Waikiki",catch:"ビーチとパンケーキ"},
+    {name:"ホノルル",wiki:"ワイキキ",en:"Waikiki",catch:"ビーチとパンケーキ",city:"Honolulu"},
     {name:"パリ",wiki:"パリ",en:"Paris",catch:"街歩きとパティスリー"}];
-  let searchDone = false;
+  const d4 = (name,wiki,en,c,city) => ({name,wiki,en,catch:c,city});
+  const REGIONS = [
+    {name:"アメリカ・カナダ", lead:"大都市の街歩きから、西海岸のビーチまで。", items:[
+      d4("ニューヨーク","ニューヨーク","New York City","摩天楼とベーグル"),
+      d4("ロサンゼルス","ロサンゼルス","Los Angeles","ビーチとハリウッド"),
+      d4("サンフランシスコ","ゴールデン・ゲート・ブリッジ","Golden Gate Bridge","坂道とゴールデンゲート","San Francisco"),
+      d4("ラスベガス","ラスベガス・ストリップ","Las Vegas Strip","ショーと夜のネオン","Las Vegas"),
+      d4("シアトル","シアトル","Seattle","コーヒーと港町"),
+      d4("バンクーバー","バンクーバー","Vancouver","自然と街のいいとこ取り")]},
+    {name:"東南アジア", lead:"屋台グルメ、寺院、リゾート。近くてお手ごろ。", items:[
+      d4("バンコク","バンコク","Bangkok","寺院とナイトマーケット"),
+      d4("チェンマイ","チェンマイ","Chiang Mai","古い町並みとカフェ"),
+      d4("プーケット","パトンビーチ","Patong","青い海とビーチリゾート","Phuket"),
+      d4("ダナン","ダナン","Da Nang","ビーチとホイアンの灯り"),
+      d4("ホーチミン","ホーチミン市","Ho Chi Minh City","バインミーと雑貨"),
+      d4("シンガポール","マリーナベイ・サンズ","Marina Bay Sands","夜景とホーカー","Singapore"),
+      d4("バリ島","バリ島","Bali","ヴィラとライステラス"),
+      d4("セブ島","セブ島","Cebu","海とアイランドホッピング")]},
+    {name:"ヨーロッパ", lead:"石畳の街、カフェ、美術館。憧れの街めぐり。", items:[
+      d4("パリ","パリ","Paris","街歩きとパティスリー"),
+      d4("ロンドン","タワーブリッジ","Tower Bridge","アフタヌーンティーとマーケット","London"),
+      d4("ローマ","コロッセオ","Colosseum","遺跡とジェラート","Rome"),
+      d4("フィレンツェ","フィレンツェ","Florence","ルネサンスの街並み"),
+      d4("バルセロナ","サグラダ・ファミリア","Sagrada Família","ガウディとタパス","Barcelona"),
+      d4("プラハ","カレル橋","Charles Bridge","おとぎ話のような旧市街","Prague"),
+      d4("ウィーン","ウィーン","Vienna","カフェと音楽"),
+      d4("サントリーニ島","サントリーニ島","Santorini","白い家と夕日")]},
+    {name:"ハワイ・リゾート", lead:"海でのんびり。ご褒美の旅に。", items:[
+      d4("ホノルル","ワイキキ","Waikiki","ビーチとパンケーキ","Honolulu"),
+      d4("マウイ島","マウイ島","Maui","サンライズと絶景ドライブ"),
+      d4("グアム","グアム","Guam","近くて気軽な南の島"),
+      d4("モルディブ","モルディブ","Maldives","水上ヴィラ"),
+      d4("カンクン","カンクン","Cancún","カリブ海のビーチ")]},
+    {name:"オセアニア", lead:"大自然とおしゃれな街。季節が日本と逆。", items:[
+      d4("シドニー","シドニー・オペラハウス","Sydney Opera House","港とカフェ","Sydney"),
+      d4("メルボルン","メルボルン","Melbourne","路地裏カフェとアート"),
+      d4("ケアンズ","グレート・バリア・リーフ","Great Barrier Reef","サンゴ礁の海","Cairns"),
+      d4("ゴールドコースト","ゴールドコースト","Gold Coast","ビーチとテーマパーク"),
+      d4("クイーンズタウン","クイーンズタウン (ニュージーランド)","Queenstown, New Zealand","湖と山のアクティビティ","Queenstown")]},
+    {name:"東アジア", lead:"週末でも行ける、グルメとショッピングの旅。", items:[
+      d4("ソウル","ソウル特別市","Seoul","カフェと韓国コスメ"),
+      d4("釜山","甘川文化村","Gamcheon Culture Village","カラフルな町と海","Busan"),
+      d4("済州島","済州島","Jeju Island","海と緑の島"),
+      d4("台北","台北市","Taipei","夜市と小籠包"),
+      d4("九份","九份","Jiufen","ちょうちんの灯る坂道"),
+      d4("香港","ヴィクトリア・ハーバー","Victoria Harbour","夜景と飲茶","Hong Kong"),
+      d4("上海","外灘","The Bund","レトロな洋館と夜景","Shanghai")]},
+    {name:"日本", lead:"思い立ったらすぐ行ける、国内のおすすめ。", items:[
+      d4("大阪","道頓堀","Dōtonbori","食い倒れとネオン","Osaka"),
+      d4("鎌倉","高徳院","Kōtoku-in","大仏と海辺さんぽ","Kamakura"),
+      d4("宮島","厳島神社","Itsukushima Shrine","海に浮かぶ鳥居","Miyajima"),
+      d4("函館","函館山","Mount Hakodate","夜景と海鮮","Hakodate"),
+      d4("石垣島","川平湾","Kabira Bay","エメラルドの海","Ishigaki"),
+      d4("伊勢","伊勢神宮","Ise Grand Shrine","お参りとおかげ横丁","Ise"),
+      d4("軽井沢","雲場池","Kumoba Pond","森と避暑地カフェ","Karuizawa")]},
+  ];
+  let searchDone = false, region = 0;
+  const cardHTML = (p, key, i) => `<button class="dcard" type="button" data-key="${key}">
+      ${phTag("",p,i,`<span class="nm">${esc(p.name)}</span>`)}<span class="catch">${esc(p.catch)}</span></button>`;
+  function renderRegion(){
+    const r = REGIONS[region];
+    document.querySelectorAll("#regionChips .chip").forEach((c,i) => c.setAttribute("aria-pressed", String(i === region)));
+    $("#regionLead").textContent = r.lead;
+    $("#rgrid").innerHTML = r.items.map((p,i) => cardHTML(p, `r${region}-${i}`, i + region)).join("");
+    loadPhotos($("#rgrid"));
+  }
   function renderSearch(){
     if (searchDone) return; searchDone = true;
-    $("#dgrid").innerHTML = POPULAR.map((p,i)=>`<button class="dcard" type="button" data-i="${i}">
-        ${phTag("",p,i,`<span class="nm">${esc(p.name)}</span>`)}<span class="catch">${esc(p.catch)}</span></button>`).join("");
+    $("#dgrid").innerHTML = POPULAR.map((p,i) => cardHTML(p, `p${i}`, i)).join("");
     loadPhotos($("#dgrid"));
+    $("#regionChips").innerHTML = REGIONS.map((r,i) => `<button class="chip" type="button" data-r="${i}" aria-pressed="false">${esc(r.name)}</button>`).join("");
+    renderRegion();
   }
-  $("#dgrid").addEventListener("click", e => {
-    const c = e.target.closest(".dcard"); if (!c) return;
-    const p = POPULAR[Number(c.dataset.i)];
-    pickDest(p.name, p.wiki, p.en);
+  $("#regionChips").addEventListener("click", e => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    region = Number(c.dataset.r); renderRegion();
   });
+  function onDestCard(e){
+    const c = e.target.closest(".dcard"); if (!c) return;
+    const k = c.dataset.key, m = k.match(/^r(\d+)-(\d+)$/);
+    const p = m ? REGIONS[+m[1]].items[+m[2]] : POPULAR[+k.slice(1)];
+    if (p) pickDest(p.name, p.wiki, p.en, p.city);
+  }
+  $("#dgrid").addEventListener("click", onDestCard);
+  $("#rgrid").addEventListener("click", onDestCard);
   $("#sf").addEventListener("submit", e => {
     e.preventDefault();
     const q = $("#sq").value.trim(); if (!q) { $("#sq").focus(); return; }
     pickDest(q, q, "");
   });
-  function pickDest(name, wiki, en){
+  function pickDest(name, wiki, en, city){
     $("#dest").value = name;
     location.hash = "home";
     scrolls.home = 0; window.scrollTo(0,0);
     $("#heroEyebrow").textContent = "行き先を決めました";
-    setHeroName(en || "", name);
+    setHeroName(city || en || "", name);
     $("#heroTitle").textContent = "日数や予算を決めて「プランを作る」を押してね";
     setHero(wiki, en, name);
     status("");
