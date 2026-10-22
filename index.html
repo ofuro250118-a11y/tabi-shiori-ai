@@ -9,7 +9,7 @@
 <meta name="description" content="Wayleaf（ウェイリーフ）｜行き先を入れるだけで、見どころの写真・日ごとの予定・ごはん屋さんまで入った旅行プランをAIが作ります。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Shippori+Mincho:wght@600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 /* Layout: 画面いっぱいの行き先写真をその場に固定し、スクロールで写真がズーム＆暗くなる。
@@ -61,9 +61,16 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.chips label:focus-wi
 .herotext{max-width:1120px;width:100%;margin:auto auto 26px;
   opacity:calc(1 - var(--p) * 1.1);transform:translateY(calc(var(--p) * -50px))}
 .eyebrow-w{font-size:12px;font-weight:700;letter-spacing:.3em;margin:0 0 4px;opacity:.9}
-.place-name{font-family:var(--f-display);font-weight:800;font-size:clamp(64px,15vw,184px);line-height:1;margin:0;letter-spacing:.04em;
-  text-shadow:0 4px 40px rgba(0,0,0,.25);text-wrap:balance;overflow-wrap:anywhere}
-.hero-title{font-family:var(--f-display);font-weight:600;font-size:clamp(17px,2.4vw,24px);margin:14px 0 0;max-width:34em;text-shadow:0 1px 12px rgba(0,0,0,.35);text-wrap:balance}
+/* 行き先の名前：大きな英語（細身のセリフ体）＋ 小さな日本語。1行に収まるよう自動で縮める */
+.place-name{margin:0;font-weight:400;text-shadow:0 4px 40px rgba(0,0,0,.25);max-width:100%}
+.pn-big{display:block;font-family:"Cormorant Garamond","Shippori Mincho",Georgia,serif;font-weight:500;font-style:italic;
+  font-size:clamp(56px,12vw,156px);line-height:.95;letter-spacing:-.01em;white-space:nowrap;max-width:100%}
+.pn-big.ja{font-family:var(--f-display);font-style:normal;font-weight:700;letter-spacing:.06em;line-height:1.1}
+.pn-big.wrap{white-space:normal;word-break:keep-all;overflow-wrap:anywhere}
+.pn-small{display:flex;align-items:center;gap:12px;margin-top:14px;font-family:var(--f-display);font-weight:600;font-size:clamp(14px,1.8vw,18px);letter-spacing:.35em}
+.pn-small::before{content:"";width:28px;height:1px;background:currentColor;opacity:.8}
+.pn-small:empty{display:none}
+.hero-title{word-break:auto-phrase;font-family:var(--f-display);font-weight:600;font-size:clamp(17px,2.4vw,24px);margin:14px 0 0;max-width:34em;text-shadow:0 1px 12px rgba(0,0,0,.35);text-wrap:balance}
 
 .glass{max-width:1120px;width:100%;margin:0 auto;background:var(--glass);border:1px solid var(--glass-line);border-radius:24px;padding:16px;
   -webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);
@@ -292,7 +299,7 @@ details.more-opts[open] summary::after{content:"−"}
 
     <div class="herotext">
       <p class="eyebrow-w" id="heroEyebrow">旅のしおりを作ろう</p>
-      <h1 class="place-name" id="heroPlace">どこ行く？</h1>
+      <h1 class="place-name"><span class="pn-big" id="heroBig">Where to next?</span><span class="pn-small" id="heroSmall">次は、どこへ行こう。</span></h1>
       <p class="hero-title" id="heroTitle"></p>
     </div>
 
@@ -566,12 +573,37 @@ details.more-opts[open] summary::after{content:"−"}
 
   // 作りかけのまま保存・表示された日は「もう一度作る」を出す
   function fixLoading(p){ (p?.days || []).forEach(d => { if (d.loading){ d.loading = false; d.error = "この日の予定はまだできていません。"; } }); return p; }
+  // 英語名があれば英語を大きく・日本語を小さく。なければ日本語を大きく。
+  function setHeroName(en, ja){
+    const big = $("#heroBig"), small = $("#heroSmall");
+    const useEn = !!(en && en.trim() && en.trim() !== (ja||"").trim());
+    big.textContent = useEn ? en.trim() : (ja || "");
+    big.classList.toggle("ja", !useEn);
+    small.textContent = useEn ? (ja || "") : "";
+    fitHeroName();
+  }
+  // はみ出す時は1行に収まるまで文字を小さくする（それでも無理なら単語の区切りで折り返す）
+  function fitHeroName(){
+    const big = $("#heroBig"); if (!big) return;
+    big.style.fontSize = ""; big.classList.remove("wrap");
+    const box = big.parentElement.clientWidth;
+    if (!box) return;
+    const w = big.scrollWidth;
+    if (w > box){
+      const size = parseFloat(getComputedStyle(big).fontSize) * box / w * 0.98;
+      if (size >= 34) big.style.fontSize = size + "px";
+      else { big.style.fontSize = "34px"; big.classList.add("wrap"); }
+    }
+  }
+  addEventListener("resize", () => fitHeroName());
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeroName);
+
   function renderHero(){
     if (!plan){
       heroToken++;
       $("#heroEyebrow").textContent = "旅のしおりを作ろう";
       $("#cue").firstChild.textContent = "スクロールして使い方を見る";
-      $("#heroPlace").textContent = "どこ行く？";
+      setHeroName("Where to next?", "次は、どこへ行こう。");
       $("#heroTitle").textContent = "行き先を入れるだけで、見どころ・予定・ごはん屋さんまでAIがまとめます。";
       $("#pin").querySelectorAll("img").forEach(i => { i.classList.remove("on"); setTimeout(() => i.remove(), 900); });
       $("#heroCredit").hidden = true;
@@ -579,7 +611,7 @@ details.more-opts[open] summary::after{content:"−"}
     }
     $("#heroEyebrow").textContent = planIsExample ? "見本プラン" : "あなたのプラン";
     $("#cue").firstChild.textContent = "スクロールしてプランを見る";
-    $("#heroPlace").textContent = dest;
+    setHeroName(plan.destEn || "", dest);
     $("#heroTitle").textContent = plan.title || "";
     setHero(plan.destWiki || dest, plan.destEn || "", dest);
   }
@@ -733,7 +765,7 @@ details.more-opts[open] summary::after{content:"−"}
     location.hash = "home";
     scrolls.home = 0; window.scrollTo(0,0);
     $("#heroEyebrow").textContent = "行き先を決めました";
-    $("#heroPlace").textContent = name;
+    setHeroName(en || "", name);
     $("#heroTitle").textContent = "日数や予算を決めて「プランを作る」を押してね";
     setHero(wiki, en, name);
     status("");
@@ -974,7 +1006,7 @@ details.more-opts[open] summary::after{content:"−"}
     const destVal = $("#dest").value.trim();
     if (!destVal) { status("行き先を入れてね。", true); return; }
     busy = true; runId++; $("#go").disabled = true; $("#go").textContent = "作成中…"; $("#plan").classList.add("loading");
-    $("#heroPlace").textContent = destVal; $("#heroTitle").textContent = ""; $("#heroEyebrow").textContent = "プランを作っています";
+    setHeroName("", destVal); $("#heroTitle").textContent = ""; $("#heroEyebrow").textContent = "プランを作っています";
     setHero(destVal, "", destVal);
     status("旅の骨組みを考え中…（10〜20秒ほど）");
     const waits = [
