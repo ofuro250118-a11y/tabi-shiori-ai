@@ -740,7 +740,8 @@ details.more-opts[open] summary::after{content:"−"}
     const lat = num(obj.lat), lng = num(obj.lng);
     return okLL(lat,lng) ? {lat,lng} : null;
   }
-  let map = null, mapLayer = null, points = [], dayFilter = "all";
+  let map = null, mapLayer = null, points = [], dayFilter = "all", lastBounds = null;
+  function fitToPoints(){ if (map && lastBounds) map.fitBounds(lastBounds, {padding:[40,40], maxZoom:15}); }
   async function collectPoints(){
     const out = [], days = Array.isArray(plan.days) ? plan.days : [];
     for (let di=0; di<days.length; di++){
@@ -763,13 +764,13 @@ details.more-opts[open] summary::after{content:"−"}
     if (!window.L){ $("#map").innerHTML = `<div class="empty" style="margin:20px">地図を読み込めませんでした。ページを再読み込みしてね。</div>`; return; }
     if (!map){
       map = L.map("map", {zoomControl:true, scrollWheelZoom:false, tap:true});
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        maxZoom:19, subdomains:"abcd",
-        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom:19,
+        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       }).addTo(map);
       map.setView([35.0116,135.7681], 12);
     }
-    setTimeout(() => map.invalidateSize(), 50);
+    setTimeout(() => { map.invalidateSize(); fitToPoints(); }, 60);
     if (!mapDirty) return;
     mapDirty = false; dayFilter = "all";
     $("#plist").innerHTML = `<li class="mapnote" style="padding:10px 0">場所を調べています…</li>`;
@@ -798,7 +799,9 @@ details.more-opts[open] summary::after{content:"−"}
       if (p.day >= 0) (byDay[p.day] = byDay[p.day] || []).push([p.ll.lat, p.ll.lng]);
     });
     Object.entries(byDay).forEach(([d,ll]) => { if (ll.length > 1) L.polyline(ll, {color:DAYC[d % DAYC.length], weight:3, opacity:.7, dashArray:"6 8"}).addTo(mapLayer); });
-    if (vis.length) map.fitBounds(L.latLngBounds(vis.map(p => [p.ll.lat, p.ll.lng])), {padding:[40,40], maxZoom:15});
+    lastBounds = vis.length ? L.latLngBounds(vis.map(p => [p.ll.lat, p.ll.lng])) : null;
+    map.invalidateSize();
+    fitToPoints();
     $("#plist").innerHTML = vis.length ? vis.map((p,i)=>`<li><button type="button" data-p="${points.indexOf(p)}">
         <span class="num" style="--c:${p.day===-1?"#7A7680":DAYC[p.day % DAYC.length]}">${esc(String(p.n))}</span>
         <span class="tm">${esc(p.day===-1?"":(plan.days[p.day]?.label||"")+" "+p.time)}</span>
