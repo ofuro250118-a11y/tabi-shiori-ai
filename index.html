@@ -238,6 +238,17 @@ details.more-opts[open] summary::after{content:"−"}
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .mapbox{height:min(60svh,560px);min-height:320px;border-radius:22px;overflow:hidden;border:1px solid var(--line);background:var(--soft);position:relative;z-index:0}
 .mapnote{font-size:12px;color:var(--muted);margin:0}
+.dayload{background:var(--soft);border-radius:16px;padding:16px 18px;font-weight:700;font-size:14px;color:var(--ink);display:flex;flex-direction:column;gap:8px}
+.dayload .tip{font-weight:500}
+.dayload i{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--line),var(--bg),var(--line));background-size:200% 100%}
+.dayload i:nth-of-type(2){width:80%}.dayload i:nth-of-type(3){width:60%}
+.dayload.err{color:var(--accent)}
+.dayload.err .btn{align-self:flex-start;margin-top:4px}
+.spin{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);vertical-align:-2px;margin-right:8px}
+@media (prefers-reduced-motion:no-preference){
+  .spin{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+  .dayload i{animation:shim 1.4s ease-in-out infinite}@keyframes shim{from{background-position:100% 0}to{background-position:-100% 0}}
+}
 .steps{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media (max-width:720px){.steps{grid-template-columns:1fr}}
 .steps li{background:var(--soft);border-radius:20px;padding:18px 20px;font-size:14px;color:var(--muted);min-width:0}
@@ -548,6 +559,8 @@ details.more-opts[open] summary::after{content:"−"}
     return `<li class="stop-i"><span class="t">${esc(it.time)}</span><div class="body">${inner}</div></li>`;
   }
 
+  // 作りかけのまま保存・表示された日は「もう一度作る」を出す
+  function fixLoading(p){ (p?.days || []).forEach(d => { if (d.loading){ d.loading = false; d.error = "この日の予定はまだできていません。"; } }); return p; }
   function renderHero(){
     if (!plan){
       heroToken++;
@@ -608,10 +621,7 @@ details.more-opts[open] summary::after{content:"−"}
             <p>${esc(h.feature)}</p>
           </article>`).join("")}</div>
       </section>`:""}
-      ${days.map((dy,di)=>`<section class="day${rv}">
-          <div class="dayhead"><span class="dayno">${esc(dy.label||((di+1)+"日目"))}</span><span class="daytheme">${esc(dy.theme)}</span></div>
-          <ol class="stops">${(dy.items||[]).map((it,ii)=>itemHTML(it,di,ii)).join("")}</ol>
-        </section>`).join("")}
+      ${days.map((dy,di)=>dayHTML(dy,di,rv)).join("")}
       <div class="extras${rv}">
         ${budget.length?`<div class="box"><h3>予算のめやす（1人）</h3><table class="btable">${budget.map((b,i)=>`<tr class="${i===budget.length-1&&/合計/.test(b.item)?"total":""}"><td>${esc(b.item)}</td><td>${esc(b.amount)}</td></tr>`).join("")}</table></div>`:""}
         <div class="box"><h3>旅のコツ</h3><ul>${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
@@ -622,11 +632,32 @@ details.more-opts[open] summary::after{content:"−"}
     if (reveal) watchReveal($("#inner"));
   }
 
+  function dayHTML(dy, di, rv=""){
+    let body;
+    if (dy.loading) body = `<div class="dayload" role="status"><span class="spin"></span>${esc(dy.area ? dy.area + "の" : "")}予定とお店を作っています…
+        ${Array.isArray(dy.spots) && dy.spots.length ? `<p class="tip">まわる予定：${esc(dy.spots.join("、"))}</p>` : ""}
+        <i></i><i></i><i></i></div>`;
+    else if (dy.error) body = `<div class="dayload err">${esc(dy.error)}<br><button class="btn" type="button" data-retry="${di}">この日をもう一度作る</button></div>`;
+    else body = `<ol class="stops">${(dy.items||[]).map((it,ii)=>itemHTML(it,di,ii)).join("")}</ol>`;
+    return `<section class="day${rv}" id="day-${di}">
+        <div class="dayhead"><span class="dayno">${esc(dy.label||((di+1)+"日目"))}</span><span class="daytheme">${esc(dy.theme)}</span></div>
+        <div style="min-width:0">${body}</div>
+      </section>`;
+  }
+  function updateDay(i){
+    const el = document.getElementById("day-" + i); if (!el || !plan.days[i]) return;
+    el.outerHTML = dayHTML(plan.days[i], i);
+    const now = document.getElementById("day-" + i);
+    if (now) loadPhotos(now);
+  }
+
   $("#inner").addEventListener("click", e => {
     if (e.target.closest("#saveBtn")) { saveCurrent(); return; }
+    const rt = e.target.closest("[data-retry]");
+    if (rt) { loadDays([Number(rt.dataset.retry)]); return; }
     if (e.target.closest("#lastBtn")) {
       const l = loadLast(); if (!l) return;
-      plan = l.plan; dest = l.dest; planIsExample = false; savedId = null; open.clear(); mapDirty = true;
+      plan = fixLoading(l.plan); dest = l.dest; planIsExample = false; savedId = null; open.clear(); mapDirty = true;
       renderHero(); render(true); toPlan(); return;
     }
     const more = e.target.closest(".more"), pick = e.target.closest(".pick");
@@ -747,7 +778,7 @@ details.more-opts[open] summary::after{content:"−"}
     const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
     if (o){
       const s = loadSaved().find(x => x.id === o.dataset.open); if (!s) return;
-      plan = s.plan; dest = s.dest; planIsExample = !!s.example; savedId = s.id; open.clear(); mapDirty = true;
+      plan = fixLoading(s.plan); dest = s.dest; planIsExample = !!s.example; savedId = s.id; open.clear(); mapDirty = true;
       $("#dest").value = dest;
       renderHero(); render(true);
       scrolls.home = 0; location.hash = "home";
@@ -878,48 +909,89 @@ details.more-opts[open] summary::after{content:"−"}
   current = "";
   showView(location.hash.slice(1) || "home");
 
-  // ---------- プランを作る ----------
+  // ---------- プランを作る（骨組み → 各日を同時に） ----------
   const status = (t, err) => { const s=$("#status"); s.textContent=t; s.classList.toggle("err",!!err); };
-  let busy = false;
+  let busy = false, conds = null, runId = 0;
+
+  async function postPlan(body){
+    const r = await fetch("/api/plan", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+    const raw = await r.text();
+    let data = {}; try { data = JSON.parse(raw); } catch {}
+    if (!r.ok) {
+      let msg = data.error;
+      if (!msg && r.status === 404) msg = "AIの部分（api/plan.js）が見つかりません。GitHubにapiフォルダが入っているか確認してね。";
+      if (!msg && (r.status === 504 || /TIMEOUT/i.test(raw))) msg = "AIの返事に時間がかかりすぎました。もう一度試してね。";
+      throw new Error((msg || "プランを作れませんでした。もう一度試してね。") + `（エラー番号 ${r.status}${data.detail ? "：" + data.detail : ""}）`);
+    }
+    return data;
+  }
+
+  function progress(){
+    const total = plan.days.length, done = plan.days.filter(d => !d.loading && !d.error).length, bad = plan.days.filter(d => d.error).length;
+    if (done + bad < total) status(`各日の予定を作っています…（${done}/${total}日できました）`);
+    else if (bad) status(`${bad}日分を作れませんでした。その日の「もう一度作る」を押してね。`, true);
+    else status("できました！");
+  }
+
+  // 指定した日を、同時に3つまでAIに作ってもらう
+  async function loadDays(list){
+    const my = runId, cs = plan.conds || conds, outline = {title:plan.title, days:plan.days.map(d => ({label:d.label, theme:d.theme, area:d.area, flow:d.flow, spots:d.spots}))};
+    list.forEach(i => { plan.days[i].loading = true; plan.days[i].error = ""; updateDay(i); });
+    progress();
+    const queue = [...list];
+    async function worker(){
+      while (queue.length){
+        const i = queue.shift();
+        try {
+          const r = await postPlan({...cs, mode:"day", dayIndex:i, outline});
+          if (my !== runId) return;
+          plan.days[i].items = Array.isArray(r.items) ? r.items : [];
+          plan.days[i].loading = false;
+        } catch (err) {
+          if (my !== runId) return;
+          plan.days[i].loading = false;
+          plan.days[i].error = (err.message || "この日の予定を作れませんでした。").replace(/（エラー番号.*$/, "");
+        }
+        updateDay(i); mapDirty = true; progress();
+      }
+    }
+    await Promise.all(Array.from({length:Math.min(3, list.length)}, worker));
+    if (my !== runId) return;
+    if (plan.days.every(d => !d.loading && !d.error)){
+      try { localStorage.setItem("tabi-shiori:last", JSON.stringify({dest, plan})); } catch {}
+      if (savedId) updateSaved();
+    }
+  }
+
   $("#f").addEventListener("submit", async e => {
     e.preventDefault();
     if (busy) return;
     const destVal = $("#dest").value.trim();
     if (!destVal) { status("行き先を入れてね。", true); return; }
-    busy = true; $("#go").disabled = true; $("#go").textContent = "作成中…"; $("#plan").classList.add("loading");
-    // 行き先の写真だけ先に切り替える
+    busy = true; runId++; $("#go").disabled = true; $("#go").textContent = "作成中…"; $("#plan").classList.add("loading");
     $("#heroPlace").textContent = destVal; $("#heroTitle").textContent = ""; $("#heroEyebrow").textContent = "プランを作っています";
     setHero(destVal, "", destVal);
-    status("見どころ・プラン・お店を考え中…（30秒〜1分ほど）");
+    status("旅の骨組みを考え中…（10〜20秒ほど）");
     const waits = [
-      setTimeout(() => status("お店や移動時間を調べています…もう少し待ってね。"), 35000),
-      setTimeout(() => status("今日はAIが少し混んでいるみたい。あと少しでできあがります…"), 75000),
-      setTimeout(() => status("まだ考えています…長い日程だと2〜3分かかることがあります。"), 130000)];
+      setTimeout(() => status("見どころとエリアを決めています…もう少し待ってね。"), 25000),
+      setTimeout(() => status("今日はAIが少し混んでいるみたい。あと少しです…"), 60000)];
+    conds = {
+      dest:destVal, days:$("#days").value, people:$("#people").value, start:$("#start").value,
+      from:$("#from").value, budget:$("#budget").value, pace:$("#pace").value, notes:$("#notes").value,
+      interests:[...document.querySelectorAll("#interests input:checked")].map(i=>i.value)
+    };
     try {
-      const r = await fetch("/api/plan", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          dest:destVal, days:$("#days").value, people:$("#people").value, start:$("#start").value,
-          from:$("#from").value, budget:$("#budget").value, pace:$("#pace").value, notes:$("#notes").value,
-          interests:[...document.querySelectorAll("#interests input:checked")].map(i=>i.value)
-        })
-      });
-      const raw = await r.text();
-      let data = {}; try { data = JSON.parse(raw); } catch {}
-      if (!r.ok || !Array.isArray(data.days)) {
-        let msg = data.error;
-        if (!msg && r.status === 404) msg = "AIの部分（api/plan.js）が見つかりません。GitHubにapiフォルダが入っているか確認してね。";
-        if (!msg && (r.status === 504 || /TIMEOUT/i.test(raw))) msg = "AIの返事に時間がかかりすぎました。日数を短くするか、もう一度試してね。";
-        msg = (msg || "プランを作れませんでした。もう一度試してね。") + `（エラー番号 ${r.status}${data.detail ? "：" + data.detail : ""}）`;
-        throw new Error(msg);
-      }
-      plan = data; planIsExample = false; dest = destVal; open.clear(); savedId = null; mapDirty = true;
-      try { localStorage.setItem("tabi-shiori:last", JSON.stringify({dest, plan})); } catch {}
+      const o = await postPlan({...conds, mode:"outline"});
+      if (!Array.isArray(o.days) || !o.days.length) throw new Error("プランを作れませんでした。もう一度試してね。");
+      waits.forEach(clearTimeout);
+      o.days = o.days.map(d => ({...d, items:[], loading:true, error:""}));
+      o.conds = conds;
+      plan = o; planIsExample = false; dest = destVal; open.clear(); savedId = null; mapDirty = true;
+      $("#plan").classList.remove("loading");
       renderHero();
       render(true);
-      status("できました。下にスクロールしてね。");
-      // 写真の上にプランがせり上がってくるところまで自動でスクロール
       setTimeout(() => window.scrollTo({top: $("#plan").offsetTop, behavior: reduced ? "auto" : "smooth"}), 350);
+      await loadDays(plan.days.map((_, i) => i));
     } catch (err) {
       status(err.message || "通信に失敗しました。もう一度試してね。", true);
       $("#heroEyebrow").textContent = "プランを作れませんでした";
