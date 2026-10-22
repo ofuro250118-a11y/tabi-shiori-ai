@@ -17,11 +17,19 @@ const MODELS = [
 
 const clip = (v, n) => String(v ?? "").slice(0, n).trim();
 
+// ---------- 飛行機 ----------
+// "2026-10-30T10:00" → "2026年10月30日 10:00"
+const dt = v => { const m = String(v || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); return m ? `${m[1]}年${+m[2]}月${+m[3]}日 ${m[4]}:${m[5]}` : ""; };
+const leg = l => (l && clip(l.from, 60) && clip(l.to, 60) && dt(l.dep) && dt(l.arr))
+  ? { no: clip(l.no, 12), from: clip(l.from, 60), to: clip(l.to, 60), dep: clip(l.dep, 16), arr: clip(l.arr, 16) } : null;
+const legText = l => `${l.no ? l.no + " " : ""}${l.from} ${dt(l.dep)} 発 → ${l.to} ${dt(l.arr)} 着`;
+
 // ---------- 共通の条件 ----------
 function conditions(b) {
   const n = Math.min(Math.max(parseInt(b.days, 10) || 3, 1), 10);
   const pace = ["のんびり", "ふつう", "ぎっしり"].includes(b.pace) ? b.pace : "ふつう";
   const hotel = clip(b.hotel, 120);
+  const out = leg(b.flight?.out), ret = leg(b.flight?.ret);
   const gender = GENDERS.includes(b.gender) ? b.gender : "";
   const age = AGES.includes(b.age) ? b.age : "";
   const interests = Array.isArray(b.interests) ? b.interests.slice(0, 15).map(s => clip(s, 20)).join("、") : "";
@@ -36,13 +44,21 @@ function conditions(b) {
 - 予算(1人あたり): ${clip(b.budget, 20)}
 - したいこと: ${interests || "おまかせ"}
 - ペース: ${pace}
-- 泊まるホテル: ${hotel || "未定（おまかせ）"}
+- 泊まるホテル: ${hotel || "未定（おまかせ）"}${out ? `
+- 行きの飛行機: ${legText(out)}` : ""}${ret ? `
+- 帰りの飛行機: ${legText(ret)}` : ""}
 - その他: ${clip(b.notes, 400) || "なし"}${hotel ? `
 
 ホテルについて:
 - 泊まるホテルは「${hotel}」に決まっている。ここを拠点にする。
 - 朝はホテルから出発し、夜はホテルに戻る流れで組む。ホテルからの移動時間も考え、ホテルから行きやすいエリア・お店を優先する。
-- 初日はホテルにチェックイン（または荷物を預ける）、最終日はチェックアウトを予定に入れる。` : ""}`;
+- 初日はホテルにチェックイン（または荷物を預ける）、最終日はチェックアウトを予定に入れる。` : ""}${out ? `
+
+飛行機について（時刻はすべてその空港の現地時間）:
+- 1日目は、行きの便が「${out.to}」に着く時刻から始める。最初の予定は空港への到着にする。
+- 着いてから動き出すまでに、国際線なら入国審査と荷物の受け取りで約1.5時間、国内線なら約30分かかる。さらに空港から市内・ホテルへの移動時間も入れる。
+- 着くのが夜なら、1日目は夕食とホテルだけでよい。早朝なら、まずホテルに荷物を預けてから動く。` : ""}${ret ? `
+- 最終日は、帰りの便（${ret.from} ${dt(ret.dep)} 発）に間に合うように終える。国際線は出発の3時間前、国内線は1.5時間前までに空港に着くように、空港までの移動時間も考える。最後の予定は空港への移動・出発にする。` : ""}`;
   const perDay = pace === "ぎっしり" ? "4〜6" : pace === "のんびり" ? "2〜3" : "3〜4";
   return { n, pace, perDay, text, gender, age };
 }
