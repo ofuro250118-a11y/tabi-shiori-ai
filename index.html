@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>旅のしおりAI</title>
-<meta name="description" content="行き先を入れるだけで、見どころの写真・日ごとの予定・ごはん屋さんまで入った旅行プランをAIが作ります。">
+<title>Wayleaf</title>
+<meta name="application-name" content="Wayleaf">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23D9677A%22/%3E%3Cpath d=%22M9 23C9 14 15 8 24 8c0 9-6 15-15 15z%22 fill=%22%23fff%22/%3E%3Cpath d=%22M9 23l9-9%22 stroke=%22%23D9677A%22 stroke-width=%221.6%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<meta name="description" content="Wayleaf（ウェイリーフ）｜行き先を入れるだけで、見どころの写真・日ごとの予定・ごはん屋さんまで入った旅行プランをAIが作ります。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Mono:wght@500&display=swap">
@@ -51,8 +53,9 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.chips label:focus-wi
   display:flex;flex-direction:column;color:var(--photo-ink);
   padding-top:max(18px,env(safe-area-inset-top,0px));padding-bottom:calc(20px + var(--tabh) + env(safe-area-inset-bottom,0px))}
 .brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;max-width:1120px;width:100%;margin:0 auto}
-.logo{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.08em;margin:0;text-shadow:0 1px 10px rgba(0,0,0,.25)}
-.logo small{font-family:var(--f-body);font-size:11px;letter-spacing:.24em;margin-left:6px;opacity:.85}
+.logo{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.04em;margin:0;text-shadow:0 1px 10px rgba(0,0,0,.25);display:flex;align-items:center;gap:7px}
+.logo svg{width:20px;height:20px;flex:none;filter:drop-shadow(0 1px 6px rgba(0,0,0,.25))}
+.logo small{font-family:var(--f-body);font-size:10px;font-weight:700;letter-spacing:.2em;opacity:.85;margin-left:2px}
 .credit-hero{font-size:10px;color:rgba(255,255,255,.8);text-decoration:none;max-width:50%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .credit-hero:hover{color:#fff;text-decoration:underline}
 .herotext{max-width:1120px;width:100%;margin:auto auto 26px;
@@ -272,7 +275,7 @@ details.more-opts[open] summary::after{content:"−"}
 
   <header class="hero gutter">
     <div class="brand">
-      <p class="logo">旅のしおり<small>AI</small></p>
+      <p class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20C4 10.5 10.5 4 20 4c0 9.5-6.5 16-16 16z" fill="#fff"/><path d="M4.5 19.5L13 11" stroke="#D9677A" stroke-width="1.6" stroke-linecap="round"/></svg>Wayleaf<small>旅のしおりAI</small></p>
       <a class="credit-hero" id="heroCredit" target="_blank" rel="noopener" hidden></a>
     </div>
 
