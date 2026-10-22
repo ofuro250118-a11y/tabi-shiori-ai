@@ -39,7 +39,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.chips label:focus-wi
 
 /* ===== 固定される写真 ===== */
 .stage{position:relative}
-.pin{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;z-index:0;background:var(--g,linear-gradient(135deg,#A9B9DD,#E2D3EE))}
+.pin{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;z-index:0;background:linear-gradient(160deg,#C98296 0%,#8C97C9 52%,#6FAE9F 100%)}
 .pin img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .9s ease;
   transform:scale(calc(1.02 + var(--p) * .14));filter:brightness(calc(1 - var(--p) * .5));will-change:transform}
 .pin img.on{opacity:1}
@@ -218,7 +218,7 @@ details.more-opts[open] summary::after{content:"−"}
 .empty{background:var(--soft);border-radius:20px;padding:28px 24px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 .empty button{margin-top:12px}
-.btn{font:inherit;font-weight:700;font-size:13px;border-radius:999px;padding:7px 16px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);display:inline-flex;align-items:center;gap:6px}
+.btn{text-decoration:none;font:inherit;font-weight:700;font-size:13px;border-radius:999px;padding:7px 16px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);display:inline-flex;align-items:center;gap:6px}
 .btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .btn.danger{color:var(--accent);border-color:var(--accent)}
 .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
@@ -235,6 +235,11 @@ details.more-opts[open] summary::after{content:"−"}
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .mapbox{height:min(60svh,560px);min-height:320px;border-radius:22px;overflow:hidden;border:1px solid var(--line);background:var(--soft);position:relative;z-index:0}
 .mapnote{font-size:12px;color:var(--muted);margin:0}
+.steps{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:720px){.steps{grid-template-columns:1fr}}
+.steps li{background:var(--soft);border-radius:20px;padding:18px 20px;font-size:14px;color:var(--muted);min-width:0}
+.steps span{display:inline-block;font-family:var(--f-display);font-weight:800;font-size:28px;line-height:1;color:var(--accent);margin-bottom:8px}
+.steps b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 .mk{width:30px;height:30px;border-radius:50%;background:var(--c);color:#fff;font:700 12px/26px "DM Mono",monospace;text-align:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 .mk.star{background:#fff;color:var(--c);border-color:var(--c);font-size:14px}
 .leaflet-popup-content{font-family:var(--f-body);font-size:13px;line-height:1.6;margin:10px 14px}
@@ -272,8 +277,8 @@ details.more-opts[open] summary::after{content:"−"}
     </div>
 
     <div class="herotext">
-      <p class="eyebrow-w" id="heroEyebrow">見本プラン</p>
-      <h1 class="place-name" id="heroPlace">京都</h1>
+      <p class="eyebrow-w" id="heroEyebrow">旅のしおりを作ろう</p>
+      <h1 class="place-name" id="heroPlace">どこ行く？</h1>
       <p class="hero-title" id="heroTitle"></p>
     </div>
 
@@ -509,7 +514,7 @@ details.more-opts[open] summary::after{content:"−"}
   }
 
   // ---------- 表示 ----------
-  let plan = null, planIsExample = true, dest = "京都", savedId = null, mapDirty = true;
+  let plan = null, planIsExample = false, dest = "", savedId = null, mapDirty = true;
   const open = new Set();
   const mapUrl = q => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q + " " + dest);
   const photoUrl = q => "https://www.google.com/search?tbm=isch&q=" + encodeURIComponent(dest + " " + q);
@@ -541,13 +546,44 @@ details.more-opts[open] summary::after{content:"−"}
   }
 
   function renderHero(){
+    if (!plan){
+      heroToken++;
+      $("#heroEyebrow").textContent = "旅のしおりを作ろう";
+      $("#cue").firstChild.textContent = "スクロールして使い方を見る";
+      $("#heroPlace").textContent = "どこ行く？";
+      $("#heroTitle").textContent = "行き先を入れるだけで、見どころ・予定・ごはん屋さんまでAIがまとめます。";
+      $("#pin").querySelectorAll("img").forEach(i => { i.classList.remove("on"); setTimeout(() => i.remove(), 900); });
+      $("#heroCredit").hidden = true;
+      return;
+    }
     $("#heroEyebrow").textContent = planIsExample ? "見本プラン" : "あなたのプラン";
+    $("#cue").firstChild.textContent = "スクロールしてプランを見る";
     $("#heroPlace").textContent = dest;
     $("#heroTitle").textContent = plan.title || "";
     setHero(plan.destWiki || dest, plan.destEn || "", dest);
   }
 
+  const loadLast = () => { try { const l = JSON.parse(localStorage.getItem("tabi-shiori:last") || "null"); return l && l.plan && Array.isArray(l.plan.days) ? l : null; } catch { return null; } };
+  function renderEmpty(reveal){
+    const rv = reveal ? " rv" : "", last = loadLast();
+    $("#inner").innerHTML = `
+      <section class="intro${rv}">
+        <p class="eyebrow">使い方</p>
+        <h2>3ステップで、旅のしおりができあがり</h2>
+        <ol class="steps">
+          <li><span>1</span><b>行き先を決める</b>上の「どこ行く？」に入れるか、下の「探す」から人気の行き先を選ぶ。</li>
+          <li><span>2</span><b>条件を入れる</b>日数・人数・予算を選ぶ。「こだわり条件」でしたいことや希望も伝えられる。</li>
+          <li><span>3</span><b>プランを作る</b>見どころの写真、日ごとの予定、ごはん屋さんまで1分ほどでできあがり。</li>
+        </ol>
+        <div class="actions">
+          <a class="btn primary" href="#search">人気の行き先から探す</a>
+          ${last ? `<button class="btn" type="button" id="lastBtn">前回のプラン（${esc(last.dest)}）を見る</button>` : ""}
+        </div>
+      </section>`;
+    if (reveal) watchReveal($("#inner"));
+  }
   function render(reveal){
+    if (!plan) return renderEmpty(reveal);
     const p = plan, rv = reveal ? " rv" : "";
     const days = Array.isArray(p.days)?p.days:[], hl = Array.isArray(p.highlights)?p.highlights:[];
     const budget = Array.isArray(p.budget)?p.budget:[], tips = Array.isArray(p.tips)?p.tips:[], pack = Array.isArray(p.packing)?p.packing:[];
@@ -585,6 +621,11 @@ details.more-opts[open] summary::after{content:"−"}
 
   $("#inner").addEventListener("click", e => {
     if (e.target.closest("#saveBtn")) { saveCurrent(); return; }
+    if (e.target.closest("#lastBtn")) {
+      const l = loadLast(); if (!l) return;
+      plan = l.plan; dest = l.dest; planIsExample = false; savedId = null; open.clear(); mapDirty = true;
+      renderHero(); render(true); toPlan(); return;
+    }
     const more = e.target.closest(".more"), pick = e.target.closest(".pick");
     if (!more && !pick) return;
     const k = (more||pick).dataset.k;
@@ -760,6 +801,13 @@ details.more-opts[open] summary::after{content:"−"}
     return out.filter(p => p.ll);
   }
   async function showMap(){
+    $("#map").hidden = !plan; $("#mapNote").hidden = !plan;
+    if (!plan){
+      $("#mapTitle").textContent = "";
+      $("#dayChips").innerHTML = "";
+      $("#plist").innerHTML = `<li class="empty"><b>まだプランがありません</b>ホームでプランを作ると、行く場所がここの地図に出ます。<br><a class="btn primary" href="#home" style="margin-top:12px">ホームへ</a></li>`;
+      return;
+    }
     $("#mapTitle").textContent = plan.title || "";
     if (!window.L){ $("#map").innerHTML = `<div class="empty" style="margin:20px">地図を読み込めませんでした。ページを再読み込みしてね。</div>`; return; }
     if (!map){
@@ -822,51 +870,6 @@ details.more-opts[open] summary::after{content:"−"}
     p.marker.openPopup();
   });
 
-  // ---------- 見本プラン ----------
-  const shop = (name,genre,price,why)=>({name,genre,price,why});
-  plan = {
-    title:"京都 2泊3日　抹茶とカフェでゆるっと古都さんぽ",
-    summary:"1日目は東山の坂道と祇園、2日目は朝の嵐山と宇治で抹茶三昧。最終日は朝イチの伏見稲荷で、人の少ない千本鳥居を撮って帰ります。",
-    destWiki:"京都市", destEn:"Kyoto",
-    meta:[{label:"出発",value:"東京"},{label:"人数",value:"2人"},{label:"ペース",value:"ふつう"}],
-    highlights:[
-      {name:"伏見稲荷大社",wiki:"伏見稲荷大社",en:"Fushimi Inari-taisha",feature:"朱色の鳥居がどこまでも続く千本鳥居。朝の光の中がいちばんきれい。"},
-      {name:"清水寺",wiki:"清水寺",en:"Kiyomizu-dera",feature:"崖の上に張り出した木造の舞台。秋の紅葉と夜のライトアップが有名。"},
-      {name:"嵐山",wiki:"嵐山 (京都府)",en:"Arashiyama",feature:"竹林の小径や渡月橋がある、川と山に囲まれたエリア。"},
-      {name:"八坂の塔（法観寺）",wiki:"法観寺",en:"Hōkan-ji",feature:"石畳の坂道の先に五重塔が見える、京都らしい写真が撮れる場所。"},
-      {name:"金閣寺",wiki:"鹿苑寺",en:"Kinkaku-ji",feature:"池に映る金色のお寺。晴れた日は特にまぶしい。"},
-      {name:"平等院鳳凰堂",wiki:"平等院",en:"Byōdō-in",feature:"10円玉の絵柄のお寺。池の前から見る姿が左右対称で美しい。"}],
-    days:[
-      {label:"1日目",theme:"東山の坂道をおさんぽ",items:[
-        {time:"10:30",place:"京都駅",wiki:"京都駅",activity:"新幹線で到着。ホテルに荷物を預けて身軽に。",tip:"駅のロッカーはお昼前に埋まりがち。"},
-        {time:"12:00",type:"meal",meal:"ランチ",shop:shop("イカリヤ食堂","洋食","¥1,500前後","レトロでかわいい店内。ふわとろオムライスが人気。"),
-          alternatives:[shop("ぎをん 権兵衛","うどん・丼","¥1,500前後","老舗の親子丼とけいらんうどん。"),shop("祇園 おくむら","フレンチ","¥3,500前後","町家でちょっと贅沢ランチ。"),shop("やよい 本店","ちりめん山椒・お茶漬け","¥1,500前後","軽めにすませたい日に。")]},
-        {time:"14:00",place:"清水寺 → 二年坂・三年坂",wiki:"清水寺",activity:"舞台から景色を見て、坂道で写真タイム。",tip:"歩きやすい靴で。",cost:"¥500"},
-        {time:"16:00",type:"meal",meal:"カフェ",shop:shop("茶寮都路里 祇園本店","抹茶パフェ","¥1,700前後","抹茶好きなら外せない定番パフェ。"),
-          alternatives:[shop("% ARABICA 京都 東山","コーヒー","¥600前後","八坂の塔の近くでラテを片手に。"),shop("ぎをん小森","甘味処","¥1,500前後","白川沿いの町家でわらび餅。")]},
-        {time:"19:00",type:"meal",meal:"ディナー",shop:shop("先斗町 ますだ","京料理・おばんざい","¥5,000前後","細い路地の雰囲気ごと楽しめるお店。"),
-          alternatives:[shop("焼肉 弘 先斗町店","焼肉","¥6,000前後","鴨川近くで京都牛の焼肉。"),shop("先斗町 魯ビン","創作和食","¥5,000前後","鴨川を眺めながらごはん。")]}]},
-      {label:"2日目",theme:"嵐山と宇治で抹茶づくし",items:[
-        {time:"08:30",place:"嵐山 竹林の小径",wiki:"嵐山 (京都府)",activity:"朝の静かな竹林をおさんぽ。",tip:"9時をすぎると一気に混みます。"},
-        {time:"11:30",type:"meal",meal:"ランチ",shop:shop("湯豆腐 嵯峨野","湯豆腐","¥4,000前後","嵐山らしいやさしいランチ。"),
-          alternatives:[shop("eX cafe 京都嵐山本店","和カフェ","¥1,500前後","七輪で焼くお団子が楽しい。"),shop("嵐山 よしむら","そば","¥1,800前後","渡月橋が見える窓際席。")]},
-        {time:"14:00",place:"宇治 平等院",wiki:"平等院",activity:"10円玉の鳳凰堂を実際に見る。",cost:"¥700"},
-        {time:"15:30",type:"meal",meal:"カフェ",shop:shop("中村藤吉本店","抹茶スイーツ","¥1,500前後","竹筒に入った生茶ゼリイが名物。"),
-          alternatives:[shop("伊藤久右衛門 宇治本店","抹茶パフェ・抹茶そば","¥1,500前後","お土産もまとめて買える。"),shop("通圓","お茶屋さん","¥1,000前後","宇治橋のたもとの老舗。")]},
-        {time:"19:00",type:"meal",meal:"ディナー",shop:shop("京都 錦わらい","お好み焼き・鉄板焼き","¥3,000前後","ワイワイ食べられて気軽。"),
-          alternatives:[shop("京都勝牛 先斗町本店","牛カツ","¥2,000前後","サクッと食べたい夜に。"),shop("麺屋 猪一","ラーメン","¥1,200前後","締めにしたい上品なだしのラーメン。")]}]},
-      {label:"3日目",theme:"朝の伏見稲荷から帰り道",items:[
-        {time:"07:30",place:"伏見稲荷大社",wiki:"伏見稲荷大社",activity:"千本鳥居を人の少ない時間に。",tip:"朝の光がいちばんきれい。"},
-        {time:"11:00",place:"京都駅",activity:"お土産を買って新幹線で帰る。",tip:"抹茶のお菓子は駅ナカでまとめ買い。",cost:"¥3,000"}]}],
-    budget:[{item:"交通（往復新幹線＋市内）",amount:"¥30,000"},{item:"宿泊（2泊）",amount:"¥18,000"},{item:"ごはん・カフェ",amount:"¥18,000"},{item:"拝観料・お土産",amount:"¥5,000"},{item:"合計",amount:"約¥71,000"}],
-    tips:["市内はバスより地下鉄＋徒歩が早いことが多い。","人気の寺社は朝イチが狙い目。","人気カフェは開店直後か夕方が空いてる。"],
-    packing:["歩きやすい靴","交通系ICカード","モバイルバッテリー","エコバッグ"]
-  };
-  // 前回作ったプランがあれば、見本の代わりにそれを出す
-  try {
-    const last = JSON.parse(localStorage.getItem("tabi-shiori:last") || "null");
-    if (last && last.plan && Array.isArray(last.plan.days)) { plan = last.plan; dest = last.dest || dest; planIsExample = false; }
-  } catch {}
   renderHero();
   render(true);
   current = "";
@@ -912,9 +915,8 @@ details.more-opts[open] summary::after{content:"−"}
       setTimeout(() => window.scrollTo({top: $("#plan").offsetTop, behavior: reduced ? "auto" : "smooth"}), 350);
     } catch (err) {
       status(err.message || "通信に失敗しました。もう一度試してね。", true);
-      $("#heroPlace").textContent = dest; $("#heroTitle").textContent = plan.title || "";
-      $("#heroEyebrow").textContent = planIsExample ? "見本プラン" : "あなたのプラン";
-      setHero(plan.destWiki || dest, plan.destEn || "", dest);
+      $("#heroEyebrow").textContent = "プランを作れませんでした";
+      $("#heroTitle").textContent = "少し時間をおいて、もう一度「プランを作る」を押してね。";
     } finally {
       busy = false; $("#go").disabled = false; $("#go").textContent = "プランを作る"; $("#plan").classList.remove("loading");
     }
