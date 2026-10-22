@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=DM+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 /* Layout: 画面いっぱいの行き先写真をその場に固定し、スクロールで写真がズーム＆暗くなる。
    その上を白いプランのシートがせり上がって覆う（Appleの製品ページのような重なり）。 */
@@ -19,13 +20,13 @@
   --f-display:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
   --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
   --f-mono:"DM Mono",ui-monospace,Menlo,monospace;
-  --p:0;
+  --p:0; --tabh:58px; --bar:rgba(255,255,255,.82);
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#141317; --soft:#1F1D22; --card:#1F1D22; --ink:#F0EDF0; --muted:#A6A2AB; --line:#322F37;
   --accent:#EE8FA0; --accent-soft:#3A2629; --sage:#93BBAB; --sage-soft:#22302B; --on-accent:#2A1418;
-  --field:rgba(28,27,32,.88); --field-ink:#F0EDF0; color-scheme:dark}}
+  --field:rgba(28,27,32,.88); --field-ink:#F0EDF0; --bar:rgba(22,21,26,.82); color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.75;overflow-x:hidden}
@@ -46,7 +47,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.chips label:focus-wi
 /* ===== 写真の上の文字と入力欄 ===== */
 .hero{position:relative;z-index:1;margin-top:-100vh;margin-top:-100svh;min-height:100vh;min-height:100svh;
   display:flex;flex-direction:column;color:var(--photo-ink);
-  padding-top:max(18px,env(safe-area-inset-top,0px));padding-bottom:28px}
+  padding-top:max(18px,env(safe-area-inset-top,0px));padding-bottom:calc(20px + var(--tabh) + env(safe-area-inset-bottom,0px))}
 .brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;max-width:1120px;width:100%;margin:0 auto}
 .logo{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.08em;margin:0;text-shadow:0 1px 10px rgba(0,0,0,.25)}
 .logo small{font-family:var(--f-body);font-size:11px;letter-spacing:.24em;margin-left:6px;opacity:.85}
@@ -89,14 +90,14 @@ details.more-opts[open] summary::after{content:"−"}
 .status{font-size:13px;font-weight:700;min-height:1.2em;margin:10px 2px 0;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.4)}
 .status.err{color:#FFD3DA}
 .cue{display:flex;justify-content:center;margin-top:18px;opacity:calc(1 - var(--p) * 3)}
-.cue a{color:#fff;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:.16em;display:flex;flex-direction:column;align-items:center;gap:4px}
-.cue a span{display:block;width:1px;height:26px;background:linear-gradient(#fff,transparent)}
-@media (prefers-reduced-motion:no-preference){.cue a span{animation:drip 1.8s ease-in-out infinite}
+.cue button{font:inherit;background:none;border:0;cursor:pointer;color:#fff;font-size:12px;font-weight:700;letter-spacing:.16em;display:flex;flex-direction:column;align-items:center;gap:4px}
+.cue button span{display:block;width:1px;height:26px;background:linear-gradient(#fff,transparent)}
+@media (prefers-reduced-motion:no-preference){.cue button span{animation:drip 1.8s ease-in-out infinite}
   @keyframes drip{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}}
 
 /* ===== せり上がってくるプランのシート ===== */
 .sheet{position:relative;z-index:2;background:var(--bg);border-radius:34px 34px 0 0;box-shadow:0 -24px 60px rgba(10,8,14,.22);
-  padding-top:48px;padding-bottom:max(80px,env(safe-area-inset-bottom,0px))}
+  padding-top:48px;padding-bottom:calc(60px + var(--tabh) + env(safe-area-inset-bottom,0px))}
 .sheet::before{content:"";position:absolute;top:12px;left:50%;width:44px;height:5px;margin-left:-22px;border-radius:999px;background:var(--line)}
 .inner{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
 .loading .inner{opacity:.4;transition:opacity .3s}
@@ -176,10 +177,73 @@ details.more-opts[open] summary::after{content:"−"}
 .note{font-size:12px;color:var(--muted);margin:0;text-align:center}
 
 /* 写真が隠れたあとに出る「条件を変える」ボタン */
-.back{position:fixed;z-index:5;right:max(18px,env(safe-area-inset-right,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));
+.back{position:fixed;z-index:5;right:max(18px,env(safe-area-inset-right,0px));bottom:calc(14px + var(--tabh) + env(safe-area-inset-bottom,0px));
   font:inherit;font-weight:700;font-size:13px;border:0;border-radius:999px;padding:11px 18px;background:var(--ink);color:var(--bg);cursor:pointer;
   box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .3s, transform .3s}
 .back.off{opacity:0;transform:translateY(12px);pointer-events:none}
+
+/* ===== 下のタブバー（App Store風） ===== */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--bar);border-top:1px solid var(--line);
+  -webkit-backdrop-filter:blur(22px) saturate(1.8);backdrop-filter:blur(22px) saturate(1.8);
+  padding:0 max(8px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(8px,env(safe-area-inset-left,0px))}
+.tabbar nav{max-width:560px;margin:0 auto;height:var(--tabh);display:grid;grid-template-columns:repeat(4,1fr)}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--muted);text-decoration:none;-webkit-tap-highlight-color:transparent}
+.tab svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+.tab[aria-current="page"]{color:var(--accent)}
+.tab[aria-current="page"] svg{fill:var(--accent-soft)}
+.tab:active svg{transform:scale(.88)}
+.view[hidden]{display:none!important}
+
+/* ===== 探す・マップ・保存の画面 ===== */
+.page{min-height:100vh;min-height:100svh;padding-top:max(26px,env(safe-area-inset-top,0px));padding-bottom:calc(40px + var(--tabh) + env(safe-area-inset-bottom,0px))}
+.pagewrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.ptitle{font-family:var(--f-display);font-weight:800;font-size:clamp(32px,6vw,44px);line-height:1.15;margin:0}
+.psub{margin:4px 0 0;color:var(--muted);font-size:14px}
+.sub{font-family:var(--f-display);font-weight:700;font-size:21px;margin:8px 0 0}
+.searchbox{display:flex;align-items:center;gap:8px;background:var(--soft);border-radius:14px;padding:0 6px 0 14px}
+.searchbox svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round}
+.searchbox input{background:transparent;border:0;padding:12px 4px;color:var(--ink)}
+.searchbox input:focus{box-shadow:none}
+.searchbox button{font:inherit;font-weight:700;font-size:13px;border:0;border-radius:10px;padding:7px 14px;background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+.dcard{font:inherit;color:inherit;text-align:left;background:none;border:0;padding:0;cursor:pointer;display:flex;flex-direction:column;gap:8px;min-width:0}
+.dcard .ph{aspect-ratio:3/4;max-width:100%;width:100%}
+.dcard .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 50%,rgba(15,12,20,.6));pointer-events:none}
+.dcard .nm{position:absolute;left:14px;bottom:12px;z-index:1;color:#fff;font-family:var(--f-display);font-weight:800;font-size:24px;text-shadow:0 1px 10px rgba(0,0,0,.4)}
+.dcard .catch{font-size:13px;color:var(--muted)}
+.dcard:hover .ph img.on{transform:scale(1.04)}
+
+.empty{background:var(--soft);border-radius:20px;padding:28px 24px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+.empty button{margin-top:12px}
+.btn{font:inherit;font-weight:700;font-size:13px;border-radius:999px;padding:7px 16px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.danger{color:var(--accent);border-color:var(--accent)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+
+.slist{display:flex;flex-direction:column;gap:14px}
+.scard{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center;background:var(--soft);border-radius:20px;padding:10px;min-width:0}
+.scard .ph{aspect-ratio:1/1;max-width:100%;border-radius:14px}
+.scard h3{font-family:var(--f-display);font-weight:700;font-size:17px;line-height:1.4;margin:0}
+.scard .when{font-size:12px;color:var(--muted);margin:2px 0 0}
+.scard .actions{margin-top:8px}
+
+.chiprow{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.chip{font:inherit;font-weight:700;font-size:13px;border-radius:999px;padding:5px 14px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.mapbox{height:min(60svh,560px);min-height:320px;border-radius:22px;overflow:hidden;border:1px solid var(--line);background:var(--soft);position:relative;z-index:0}
+.mapnote{font-size:12px;color:var(--muted);margin:0}
+.mk{width:30px;height:30px;border-radius:50%;background:var(--c);color:#fff;font:700 12px/26px "DM Mono",monospace;text-align:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.mk.star{background:#fff;color:var(--c);border-color:var(--c);font-size:14px}
+.leaflet-popup-content{font-family:var(--f-body);font-size:13px;line-height:1.6;margin:10px 14px}
+.leaflet-popup-content b{font-size:14px}
+.leaflet-popup-content a{color:#D9677A;font-weight:700}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.plist button{font:inherit;color:inherit;text-align:left;width:100%;background:none;border:0;border-bottom:1px solid var(--line);padding:11px 2px;cursor:pointer;display:grid;grid-template-columns:30px 50px 1fr;gap:10px;align-items:center}
+.plist .num{width:26px;height:26px;border-radius:50%;background:var(--c);color:#fff;font:700 11px/26px "DM Mono",monospace;text-align:center}
+.plist .tm{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.plist .nm2{font-weight:700;min-width:0}
+.plist .nm2 small{display:block;font-weight:500;color:var(--muted);font-size:12px}
 
 /* スクロールで下からふわっと出る（動きを減らす設定の人には出さない） */
 @media (prefers-reduced-motion:no-preference){
@@ -195,6 +259,7 @@ details.more-opts[open] summary::after{content:"−"}
 </head>
 <body>
 
+<section class="view" id="v-home">
 <div class="stage">
   <div class="pin" id="pin" aria-hidden="true"></div>
 
@@ -233,15 +298,67 @@ details.more-opts[open] summary::after{content:"−"}
       <div class="status" id="status" role="status"></div>
     </form>
 
-    <div class="cue"><a href="#plan">スクロールしてプランを見る<span></span></a></div>
+    <div class="cue"><button type="button" id="cue">スクロールしてプランを見る<span></span></button></div>
   </header>
 
   <main class="sheet gutter" id="plan" tabindex="-1">
     <div class="inner" id="inner"></div>
   </main>
 </div>
-
 <button class="back off" id="back" type="button">条件を変える ↑</button>
+</section>
+
+<section class="view page gutter" id="v-search" hidden>
+  <div class="pagewrap">
+    <div>
+      <p class="eyebrow">次はどこへ行く？</p>
+      <h1 class="ptitle">探す</h1>
+    </div>
+    <form class="searchbox" id="sf" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      <input id="sq" type="search" placeholder="行き先を検索（例：金沢、台北）" aria-label="行き先を検索">
+      <button type="submit">決定</button>
+    </form>
+    <h2 class="sub">人気の行き先</h2>
+    <div class="dgrid" id="dgrid"></div>
+  </div>
+</section>
+
+<section class="view page gutter" id="v-map" hidden>
+  <div class="pagewrap">
+    <div>
+      <p class="eyebrow">いまのプラン</p>
+      <h1 class="ptitle">マップ</h1>
+      <p class="psub" id="mapTitle"></p>
+    </div>
+    <div class="chiprow" id="dayChips"></div>
+    <div class="mapbox" id="map"></div>
+    <p class="mapnote" id="mapNote">地図の位置は目安です。お店はGoogleマップでも確認してね。</p>
+    <ol class="plist" id="plist"></ol>
+  </div>
+</section>
+
+<section class="view page gutter" id="v-saved" hidden>
+  <div class="pagewrap">
+    <div>
+      <p class="eyebrow">あなたのしおり</p>
+      <h1 class="ptitle">保存</h1>
+      <p class="psub">このブラウザに保存されます。</p>
+    </div>
+    <div class="slist" id="slist"></div>
+  </div>
+</section>
+
+<div class="tabbar">
+  <nav aria-label="メニュー">
+    <a class="tab" href="#home" data-v="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5L12 3.8l8.5 6.7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/></svg>ホーム</a>
+    <a class="tab" href="#search" data-v="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>探す</a>
+    <a class="tab" href="#map" data-v="map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5l5.5-2.5 6 2.5 5.5-2.5v13.5L15 20l-6-2.5-5.5 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>マップ</a>
+    <a class="tab" href="#saved" data-v="saved"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11a1 1 0 0 1 1 1v16l-6.5-4.2-6.5 4.2v-16a1 1 0 0 1 1-1z"/></svg>保存</a>
+  </nav>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 
 <script>
 (function(){
@@ -260,10 +377,13 @@ details.more-opts[open] summary::after{content:"−"}
 
   // ---------- スクロールの動き ----------
   const root = document.documentElement, back = $("#back");
-  let ticking = false;
+  let ticking = false, current = "home";
+  const toPlan = () => window.scrollTo({top: $("#plan").offsetTop, behavior: reduced ? "auto" : "smooth"});
+  $("#cue").addEventListener("click", toPlan);
   function onScroll(){
     if (ticking) return; ticking = true;
     requestAnimationFrame(() => {
+      if (current !== "home") { ticking = false; return; }
       const p = Math.min(Math.max(window.scrollY / window.innerHeight, 0), 1.2);
       if (!reduced) root.style.setProperty("--p", p.toFixed(4));
       back.classList.toggle("off", window.scrollY < window.innerHeight * 0.9);
@@ -387,7 +507,7 @@ details.more-opts[open] summary::after{content:"−"}
   }
 
   // ---------- 表示 ----------
-  let plan = null, planIsExample = true, dest = "京都";
+  let plan = null, planIsExample = true, dest = "京都", savedId = null, mapDirty = true;
   const open = new Set();
   const mapUrl = q => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q + " " + dest);
   const photoUrl = q => "https://www.google.com/search?tbm=isch&q=" + encodeURIComponent(dest + " " + q);
@@ -435,6 +555,10 @@ details.more-opts[open] summary::after{content:"−"}
         <h2>${esc(p.title)}</h2>
         <p class="sum">${esc(p.summary)}</p>
         <div class="meta">${(p.meta||[]).map(m=>`<span>${esc(m.label)}：${esc(m.value)}</span>`).join("")}</div>
+        <div class="actions">
+          <button class="btn primary" type="button" id="saveBtn">${savedId ? "保存済み ✓" : "このプランを保存"}</button>
+          <a class="btn" href="#map">マップで見る</a>
+        </div>
       </section>
       ${hl.length?`<section class="${rv}">
         <div class="secthead"><h3>${esc(dest)}の見どころ</h3><span>横にスワイプ ／ 写真はWikipedia・Wikimedia Commonsより</span></div>
@@ -458,6 +582,7 @@ details.more-opts[open] summary::after{content:"−"}
   }
 
   $("#inner").addEventListener("click", e => {
+    if (e.target.closest("#saveBtn")) { saveCurrent(); return; }
     const more = e.target.closest(".more"), pick = e.target.closest(".pick");
     if (!more && !pick) return;
     const k = (more||pick).dataset.k;
@@ -466,9 +591,230 @@ details.more-opts[open] summary::after{content:"−"}
       const [di,ii] = k.split("-").map(Number), ai = Number(pick.dataset.a);
       const it = plan.days[di].items[ii], chosen = it.alternatives[ai];
       it.alternatives[ai] = it.shop; it.shop = chosen; open.delete(k);
+      mapDirty = true; if (savedId) updateSaved();
     }
     render(false);
     document.querySelector(`.more[data-k="${k}"]`)?.focus({preventScroll:true});
+  });
+
+  // ---------- 画面の切り替え（下のタブバー） ----------
+  const VIEWS = ["home","search","map","saved"];
+  const scrolls = {};
+  function showView(name){
+    if (!VIEWS.includes(name)) name = "home";
+    if (name === current && !$("#v-"+name).hidden) return;
+    scrolls[current] = window.scrollY;
+    VIEWS.forEach(v => { $("#v-"+v).hidden = v !== name; });
+    document.querySelectorAll(".tab").forEach(t => t.dataset.v === name ? t.setAttribute("aria-current","page") : t.removeAttribute("aria-current"));
+    current = name;
+    window.scrollTo(0, scrolls[name] || 0);
+    if (name === "home") onScroll();
+    if (name === "search") renderSearch();
+    if (name === "saved") renderSaved();
+    if (name === "map") showMap();
+  }
+  addEventListener("hashchange", () => showView(location.hash.slice(1)));
+
+  // ---------- 探す ----------
+  const POPULAR = [
+    {name:"京都",wiki:"京都市",en:"Kyoto",catch:"古都さんぽと抹茶スイーツ"},
+    {name:"沖縄",wiki:"古宇利島",en:"Kouri Island",catch:"青い海と島ドライブ"},
+    {name:"金沢",wiki:"兼六園",en:"Kenroku-en",catch:"庭園と金箔ソフト"},
+    {name:"札幌",wiki:"札幌市",en:"Sapporo",catch:"スープカレーと夜景"},
+    {name:"福岡",wiki:"福岡市",en:"Fukuoka",catch:"屋台ともつ鍋"},
+    {name:"箱根",wiki:"芦ノ湖",en:"Lake Ashi",catch:"温泉と湖の景色"},
+    {name:"ソウル",wiki:"ソウル特別市",en:"Seoul",catch:"カフェと韓国コスメ"},
+    {name:"釜山",wiki:"甘川文化村",en:"Gamcheon Culture Village",catch:"カラフルな町と海"},
+    {name:"台北",wiki:"台北市",en:"Taipei",catch:"夜市と小籠包"},
+    {name:"バンコク",wiki:"バンコク",en:"Bangkok",catch:"寺院とナイトマーケット"},
+    {name:"ホノルル",wiki:"ワイキキ",en:"Waikiki",catch:"ビーチとパンケーキ"},
+    {name:"パリ",wiki:"パリ",en:"Paris",catch:"街歩きとパティスリー"}];
+  let searchDone = false;
+  function renderSearch(){
+    if (searchDone) return; searchDone = true;
+    $("#dgrid").innerHTML = POPULAR.map((p,i)=>`<button class="dcard" type="button" data-i="${i}">
+        ${phTag("",p,i,`<span class="nm">${esc(p.name)}</span>`)}<span class="catch">${esc(p.catch)}</span></button>`).join("");
+    loadPhotos($("#dgrid"));
+  }
+  $("#dgrid").addEventListener("click", e => {
+    const c = e.target.closest(".dcard"); if (!c) return;
+    const p = POPULAR[Number(c.dataset.i)];
+    pickDest(p.name, p.wiki, p.en);
+  });
+  $("#sf").addEventListener("submit", e => {
+    e.preventDefault();
+    const q = $("#sq").value.trim(); if (!q) { $("#sq").focus(); return; }
+    pickDest(q, q, "");
+  });
+  function pickDest(name, wiki, en){
+    $("#dest").value = name;
+    location.hash = "home";
+    scrolls.home = 0; window.scrollTo(0,0);
+    $("#heroEyebrow").textContent = "行き先を決めました";
+    $("#heroPlace").textContent = name;
+    $("#heroTitle").textContent = "日数や予算を決めて「プランを作る」を押してね";
+    setHero(wiki, en, name);
+    status("");
+    setTimeout(() => $("#days").focus({preventScroll:true}), 50);
+  }
+
+  // ---------- 保存 ----------
+  const KEY = "tabi-shiori:saved";
+  function loadSaved(){ try { const a = JSON.parse(localStorage.getItem(KEY) || "[]"); return Array.isArray(a) ? a : []; } catch { return []; } }
+  function storeSaved(a){ try { localStorage.setItem(KEY, JSON.stringify(a.slice(0,30))); return true; } catch { return false; } }
+  function saveCurrent(){
+    if (savedId) { location.hash = "saved"; return; }
+    const a = loadSaved(), id = Date.now().toString(36);
+    a.unshift({id, savedAt:Date.now(), dest, example:planIsExample, plan:JSON.parse(JSON.stringify(plan))});
+    if (!storeSaved(a)) { const b = $("#saveBtn"); if (b) b.textContent = "保存できませんでした"; return; }
+    savedId = id;
+    const b = $("#saveBtn"); if (b) b.textContent = "保存済み ✓";
+  }
+  function updateSaved(){
+    const a = loadSaved(), s = a.find(x => x.id === savedId);
+    if (s) { s.plan = JSON.parse(JSON.stringify(plan)); storeSaved(a); }
+  }
+  function renderSaved(){
+    const a = loadSaved();
+    if (!a.length){
+      $("#slist").innerHTML = `<div class="empty"><b>まだ保存したプランはありません</b>ホームでプランを作って「このプランを保存」を押すと、ここに並びます。<br><a class="btn primary" href="#home" style="margin-top:12px">ホームへ</a></div>`;
+      return;
+    }
+    $("#slist").innerHTML = a.map((s,i)=>{
+      const days = Array.isArray(s.plan?.days) ? s.plan.days.length : 0;
+      const dt = new Date(s.savedAt);
+      return `<article class="scard">
+        ${phTag("",{wiki:s.plan?.destWiki||s.dest,en:s.plan?.destEn||"",name:s.dest},i)}
+        <div style="min-width:0">
+          <h3>${esc(s.plan?.title || s.dest)}</h3>
+          <p class="when">${esc(s.dest)}・${days}日間・${dt.getMonth()+1}月${dt.getDate()}日に保存${s.example?"（見本）":""}</p>
+          <div class="actions">
+            <button class="btn primary" type="button" data-open="${esc(s.id)}">開く</button>
+            <button class="btn" type="button" data-del="${esc(s.id)}">削除</button>
+          </div>
+        </div>
+      </article>`;
+    }).join("");
+    loadPhotos($("#slist"));
+  }
+  $("#slist").addEventListener("click", e => {
+    const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
+    if (o){
+      const s = loadSaved().find(x => x.id === o.dataset.open); if (!s) return;
+      plan = s.plan; dest = s.dest; planIsExample = !!s.example; savedId = s.id; open.clear(); mapDirty = true;
+      $("#dest").value = dest;
+      renderHero(); render(true);
+      scrolls.home = 0; location.hash = "home";
+    } else if (d){
+      if (d.dataset.armed !== "1"){
+        d.dataset.armed = "1"; d.textContent = "本当に削除？"; d.classList.add("danger");
+        setTimeout(() => { if (d.isConnected){ d.dataset.armed = ""; d.textContent = "削除"; d.classList.remove("danger"); } }, 3000);
+        return;
+      }
+      storeSaved(loadSaved().filter(x => x.id !== d.dataset.del));
+      if (savedId === d.dataset.del) savedId = null;
+      renderSaved();
+    }
+  });
+
+  // ---------- マップ ----------
+  const DAYC = ["#D9677A","#4F9A80","#5F7FC6","#CF8434","#9372C6","#3E9BB3","#B5657F"];
+  const coordCache = new Map();
+  const num = v => (typeof v === "number" || typeof v === "string") && v !== "" && isFinite(+v) ? +v : NaN;
+  const okLL = (lat,lng) => isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+  function wikiCoords(title){
+    if (!title) return Promise.resolve(null);
+    if (coordCache.has(title)) return coordCache.get(title);
+    const job = api("ja.wikipedia.org", {action:"query",prop:"coordinates",titles:title,redirects:"1"}).then(j => {
+      const c = firstPage(j)?.coordinates?.[0];
+      return c ? {lat:c.lat, lng:c.lon} : null;
+    });
+    coordCache.set(title, job);
+    return job;
+  }
+  async function where(obj){
+    const w = obj.wiki ? await wikiCoords(obj.wiki) : null;
+    if (w) return w;
+    const lat = num(obj.lat), lng = num(obj.lng);
+    return okLL(lat,lng) ? {lat,lng} : null;
+  }
+  let map = null, mapLayer = null, points = [], dayFilter = "all";
+  async function collectPoints(){
+    const out = [], days = Array.isArray(plan.days) ? plan.days : [];
+    for (let di=0; di<days.length; di++){
+      let n = 0;
+      for (const it of (days[di].items || [])){
+        const isMeal = it.type === "meal" && it.shop;
+        const target = isMeal ? it.shop : it;
+        const name = isMeal ? it.shop.name : it.place;
+        if (!name) continue;
+        n++;
+        out.push({day:di, n, time:it.time||"", name, sub: isMeal ? `${it.meal||"ごはん"}・${it.shop.genre||""}` : (it.activity||""), ll: where(target)});
+      }
+    }
+    (Array.isArray(plan.highlights) ? plan.highlights : []).forEach(h => out.push({day:-1, n:"★", time:"", name:h.name, sub:"見どころ", ll: where(h)}));
+    await Promise.all(out.map(async p => { p.ll = await p.ll; }));
+    return out.filter(p => p.ll);
+  }
+  async function showMap(){
+    $("#mapTitle").textContent = plan.title || "";
+    if (!window.L){ $("#map").innerHTML = `<div class="empty" style="margin:20px">地図を読み込めませんでした。ページを再読み込みしてね。</div>`; return; }
+    if (!map){
+      map = L.map("map", {zoomControl:true, scrollWheelZoom:false, tap:true});
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        maxZoom:19, subdomains:"abcd",
+        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      }).addTo(map);
+      map.setView([35.0116,135.7681], 12);
+    }
+    setTimeout(() => map.invalidateSize(), 50);
+    if (!mapDirty) return;
+    mapDirty = false; dayFilter = "all";
+    $("#plist").innerHTML = `<li class="mapnote" style="padding:10px 0">場所を調べています…</li>`;
+    const myPlan = plan;
+    const pts = await collectPoints();
+    if (myPlan !== plan) return;
+    points = pts;
+    const days = Array.isArray(plan.days) ? plan.days : [];
+    $("#dayChips").innerHTML = [`<button class="chip" type="button" data-d="all" aria-pressed="true">すべて</button>`]
+      .concat(days.map((d,i)=>`<button class="chip" type="button" data-d="${i}" aria-pressed="false">${esc(d.label||((i+1)+"日目"))}</button>`))
+      .concat(points.some(p=>p.day===-1) ? [`<button class="chip" type="button" data-d="-1" aria-pressed="false">見どころ</button>`] : []).join("");
+    drawMap();
+  }
+  function drawMap(){
+    if (mapLayer) mapLayer.remove();
+    mapLayer = L.layerGroup().addTo(map);
+    const vis = points.filter(p => dayFilter === "all" || String(p.day) === dayFilter);
+    const byDay = {};
+    vis.forEach((p,i) => {
+      const c = p.day === -1 ? "#7A7680" : DAYC[p.day % DAYC.length];
+      const icon = L.divIcon({className:"", html:`<div class="mk${p.day===-1?" star":""}" style="--c:${c}">${esc(String(p.n))}</div>`, iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-14]});
+      const label = p.day === -1 ? "見どころ" : `${esc(plan.days[p.day]?.label || (p.day+1)+"日目")} ${esc(p.time)}`;
+      const g = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(p.name + " " + dest);
+      p.marker = L.marker([p.ll.lat, p.ll.lng], {icon, title:p.name}).addTo(mapLayer)
+        .bindPopup(`<b>${esc(p.name)}</b><br><span style="color:#7A7680">${label}</span><br>${esc(p.sub)}<br><a href="${g}" target="_blank" rel="noopener">Googleマップで開く</a>`);
+      if (p.day >= 0) (byDay[p.day] = byDay[p.day] || []).push([p.ll.lat, p.ll.lng]);
+    });
+    Object.entries(byDay).forEach(([d,ll]) => { if (ll.length > 1) L.polyline(ll, {color:DAYC[d % DAYC.length], weight:3, opacity:.7, dashArray:"6 8"}).addTo(mapLayer); });
+    if (vis.length) map.fitBounds(L.latLngBounds(vis.map(p => [p.ll.lat, p.ll.lng])), {padding:[40,40], maxZoom:15});
+    $("#plist").innerHTML = vis.length ? vis.map((p,i)=>`<li><button type="button" data-p="${points.indexOf(p)}">
+        <span class="num" style="--c:${p.day===-1?"#7A7680":DAYC[p.day % DAYC.length]}">${esc(String(p.n))}</span>
+        <span class="tm">${esc(p.day===-1?"":(plan.days[p.day]?.label||"")+" "+p.time)}</span>
+        <span class="nm2">${esc(p.name)}<small>${esc(p.sub)}</small></span></button></li>`).join("")
+      : `<li class="empty">地図に出せる場所が見つかりませんでした。</li>`;
+  }
+  $("#dayChips").addEventListener("click", e => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    dayFilter = c.dataset.d;
+    document.querySelectorAll("#dayChips .chip").forEach(x => x.setAttribute("aria-pressed", String(x === c)));
+    drawMap();
+  });
+  $("#plist").addEventListener("click", e => {
+    const b = e.target.closest("[data-p]"); if (!b) return;
+    const p = points[Number(b.dataset.p)]; if (!p?.marker) return;
+    window.scrollTo({top: $("#map").getBoundingClientRect().top + window.scrollY - 80, behavior: reduced ? "auto" : "smooth"});
+    map.setView(p.marker.getLatLng(), Math.max(map.getZoom(), 15));
+    p.marker.openPopup();
   });
 
   // ---------- 見本プラン ----------
@@ -487,7 +833,7 @@ details.more-opts[open] summary::after{content:"−"}
       {name:"平等院鳳凰堂",wiki:"平等院",en:"Byōdō-in",feature:"10円玉の絵柄のお寺。池の前から見る姿が左右対称で美しい。"}],
     days:[
       {label:"1日目",theme:"東山の坂道をおさんぽ",items:[
-        {time:"10:30",place:"京都駅",activity:"新幹線で到着。ホテルに荷物を預けて身軽に。",tip:"駅のロッカーはお昼前に埋まりがち。"},
+        {time:"10:30",place:"京都駅",wiki:"京都駅",activity:"新幹線で到着。ホテルに荷物を預けて身軽に。",tip:"駅のロッカーはお昼前に埋まりがち。"},
         {time:"12:00",type:"meal",meal:"ランチ",shop:shop("イカリヤ食堂","洋食","¥1,500前後","レトロでかわいい店内。ふわとろオムライスが人気。"),
           alternatives:[shop("ぎをん 権兵衛","うどん・丼","¥1,500前後","老舗の親子丼とけいらんうどん。"),shop("祇園 おくむら","フレンチ","¥3,500前後","町家でちょっと贅沢ランチ。"),shop("やよい 本店","ちりめん山椒・お茶漬け","¥1,500前後","軽めにすませたい日に。")]},
         {time:"14:00",place:"清水寺 → 二年坂・三年坂",wiki:"清水寺",activity:"舞台から景色を見て、坂道で写真タイム。",tip:"歩きやすい靴で。",cost:"¥500"},
@@ -513,6 +859,8 @@ details.more-opts[open] summary::after{content:"−"}
   };
   renderHero();
   render(true);
+  current = "";
+  showView(location.hash.slice(1) || "home");
 
   // ---------- プランを作る ----------
   const status = (t, err) => { const s=$("#status"); s.textContent=t; s.classList.toggle("err",!!err); };
@@ -545,7 +893,7 @@ details.more-opts[open] summary::after{content:"−"}
         msg = (msg || "プランを作れませんでした。もう一度試してね。") + `（エラー番号 ${r.status}${data.detail ? "：" + data.detail : ""}）`;
         throw new Error(msg);
       }
-      plan = data; planIsExample = false; dest = destVal; open.clear();
+      plan = data; planIsExample = false; dest = destVal; open.clear(); savedId = null; mapDirty = true;
       renderHero();
       render(true);
       status("できました。下にスクロールしてね。");
