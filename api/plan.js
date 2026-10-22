@@ -21,6 +21,8 @@ const clip = (v, n) => String(v ?? "").slice(0, n).trim();
 function conditions(b) {
   const n = Math.min(Math.max(parseInt(b.days, 10) || 3, 1), 10);
   const pace = ["のんびり", "ふつう", "ぎっしり"].includes(b.pace) ? b.pace : "ふつう";
+  const gender = GENDERS.includes(b.gender) ? b.gender : "";
+  const age = AGES.includes(b.age) ? b.age : "";
   const interests = Array.isArray(b.interests) ? b.interests.slice(0, 15).map(s => clip(s, 20)).join("、") : "";
   const text = `条件:
 - 行き先: ${clip(b.dest, 60)}
@@ -28,21 +30,35 @@ function conditions(b) {
 - 出発日: ${clip(b.start, 20) || "未定"}（季節やイベントがあれば反映）
 - 出発地: ${clip(b.from, 40) || "未定"}
 - 人数: ${clip(b.people, 10)}
+- 性別: ${gender || "指定なし"}
+- 年代: ${age || "指定なし"}
 - 予算(1人あたり): ${clip(b.budget, 20)}
 - したいこと: ${interests || "おまかせ"}
 - ペース: ${pace}
 - その他: ${clip(b.notes, 400) || "なし"}`;
   const perDay = pace === "ぎっしり" ? "4〜6" : pace === "のんびり" ? "2〜3" : "3〜4";
-  return { n, pace, perDay, text };
+  return { n, pace, perDay, text, gender, age };
 }
 
-const INTRO = `あなたは、おしゃれでトレンドに詳しい日本語の旅行プランナーです。20代の女の子が「ここ行きたい！」と思えるような、具体的で現実的な旅行プランを作ります。
+const GENDERS = ["女性", "男性", "男女ミックス"];
+const AGES = ["10代", "20代", "30代", "40代", "50代", "60代以上"];
+
+// 誰が行く旅かによって、プランナーへの頼み方を変える
+function intro(b) {
+  const { gender, age, people } = { ...conditions(b), people: clip(b.people, 10) };
+  const pre = age ? `${age}の` : "";
+  const who = gender === "男女ミックス" ? `${pre}男女${people === "2人" ? "（カップルや友だち）" : "のグループ"}`
+    : gender ? (people === "1人" ? `ひとり旅をする${pre}${gender}` : `${pre}${gender}どうし`)
+    : age ? `${age}の旅行者` : "";
+  const target = who ? `${who}が「ここ行きたい！」と思えて、その年代・メンバーで楽しめる` : "「ここ行きたい！」と思えるような";
+  return `あなたは、おしゃれでトレンドに詳しい日本語の旅行プランナーです。${target}、具体的で現実的な旅行プランを作ります。
 観光地・お店はすべて実在するものだけを使ってください。費用は円で目安を書きます（海外でも円換算）。`;
+}
 
 // ---------- 1. 骨組み ----------
 function outlinePrompt(b) {
   const c = conditions(b);
-  return `${INTRO}
+  return `${intro(b)}
 
 ${c.text}
 
@@ -79,7 +95,7 @@ function dayPrompt(b, outline, i) {
   const o = slimOutline(outline);
   const d = o.days[i];
   const isFirst = i === 0, isLast = i === o.days.length - 1;
-  return `${INTRO}
+  return `${intro(b)}
 
 ${c.text}
 
