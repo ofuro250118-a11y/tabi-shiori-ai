@@ -33,7 +33,10 @@ function buildPrompt(b) {
 写真のための名前:
 - destWiki: 行き先の日本語版Wikipediaの記事名（例 "京都市"）。destEn: 英語名。
 - highlights: その行き先を代表する有名な場所・景色がきれいな場所を6つ。name は正式な名前、feature は見た目の特徴や魅力を1文、wiki は日本語版Wikipediaの記事名、en は英語名。
-- ごはん以外の予定(観光スポット)にも、あれば wiki(日本語版Wikipediaの記事名)を入れる。駅やホテルなどには不要(空文字)。
+- ごはん以外の予定(観光スポット・駅など)にも、あれば wiki(日本語版Wikipediaの記事名)を入れる。記事がなければ空文字。
+
+地図のための位置:
+- highlights・ごはん以外の予定・各お店(shop と alternatives)に lat, lng(その場所のおおよその緯度・経度の数値)を入れる。わからなければ null。
 
 ごはんのルール:
 - 各日のランチとディナーは必ず入れる（到着が遅い日・帰る日は時間に合う分だけ）。カフェやスイーツ休憩も1日1回くらい入れてよい。
@@ -43,10 +46,10 @@ function buildPrompt(b) {
 JSONだけで答えてください。形式:
 {"title":"旅のタイトル","summary":"2〜3文の概要","destWiki":"","destEn":"",
 "meta":[{"label":"出発","value":"..."},{"label":"人数","value":"..."},{"label":"ペース","value":"..."}],
-"highlights":[{"name":"","feature":"","wiki":"","en":""}],
+"highlights":[{"name":"","feature":"","wiki":"","en":"","lat":35.0,"lng":135.7}],
 "days":[{"label":"1日目","theme":"その日のテーマ","items":[
- {"time":"09:00","place":"場所名","wiki":"","activity":"何をするか1文","tip":"短いひとこと(なければ空文字)","cost":"¥1,000(なければ空文字)"},
- {"time":"12:00","type":"meal","meal":"ランチ","shop":{"name":"","genre":"","price":"","why":""},"alternatives":[{"name":"","genre":"","price":"","why":""}]}
+ {"time":"09:00","place":"場所名","wiki":"","lat":35.0,"lng":135.7,"activity":"何をするか1文","tip":"短いひとこと(なければ空文字)","cost":"¥1,000(なければ空文字)"},
+ {"time":"12:00","type":"meal","meal":"ランチ","shop":{"name":"","genre":"","price":"","why":"","lat":35.0,"lng":135.7},"alternatives":[{"name":"","genre":"","price":"","why":"","lat":35.0,"lng":135.7}]}
 ]}],
 "budget":[{"item":"交通","amount":"¥..."},{"item":"合計","amount":"約¥..."}],
 "tips":["旅のコツを3つ"],"packing":["持ち物を3〜5個"]}
