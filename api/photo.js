@@ -2,7 +2,11 @@
 // ブラウザから直接 Openverse に聞けなかったときだけ使います。
 // 同じ言葉の検索結果は Vercel に1日保存して、Openverse への問い合わせを減らします。
 
+import { sameSite, allow } from "./_guard.js";
+
 export default async function handler(req, res) {
+  if (!sameSite(req)) return res.status(403).json({ results: [] });
+  if (!allow(req, "photo", [{ windowMs: 10 * 60e3, max: 150 }])) return res.status(429).json({ results: [] });
   const q = String(req.query?.q || "").slice(0, 100).trim();
   if (!q) return res.status(400).json({ results: [] });
   const url = "https://api.openverse.org/v1/images/?" + new URLSearchParams({

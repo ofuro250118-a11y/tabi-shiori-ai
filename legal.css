@@ -1,0 +1,32 @@
+/* Wayleaf — プライバシーポリシー・利用規約ページ用（本体と同じ色と文字） */
+:root{
+  --bg:#FFFFFF; --soft:#F7F3EE; --ink:#2A2420; --muted:#7A7066; --line:rgba(110,85,55,.15);
+  --accent:#A06A30; --accent-ink:#8A5A26;
+  --f-sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --f-sign:"Barlow Condensed","Arial Narrow",var(--f-sys);
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#12100E; --soft:#1F1B17; --ink:#F3EEE8; --muted:#A89E93; --line:rgba(255,235,210,.12);
+  --accent:#D9A566; --accent-ink:#E3B67E; color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-sys);font-size:1rem;line-height:1.85;-webkit-font-smoothing:antialiased;
+  padding:max(28px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) max(64px,env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px))}
+main{max-width:720px;margin:0 auto}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:40px}
+.logo{font-family:var(--f-sign);font-weight:700;font-size:1.5rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);text-decoration:none}
+.back{font-size:.875rem;font-weight:600;color:var(--ink);text-decoration:none;background:rgba(160,120,70,.1);border-radius:999px;padding:7px 14px}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);margin:0 0 6px}
+h1{font-size:2rem;line-height:1.25;letter-spacing:-.02em;margin:0 0 8px}
+.date{font-family:var(--f-mono);font-size:.8125rem;color:var(--muted);margin:0 0 32px}
+h2{font-size:1.125rem;letter-spacing:-.005em;margin:36px 0 8px;padding-top:20px;border-top:1px solid var(--line)}
+p,li{color:var(--ink)}
+ul,ol{padding-left:1.3em}
+li{margin:4px 0}
+.note{background:var(--soft);border-radius:16px;padding:14px 18px;font-size:.9375rem;margin:20px 0}
+a{color:var(--accent-ink)}
+.contact{font-family:var(--f-mono);font-size:1rem;background:var(--soft);border-radius:10px;padding:10px 14px;display:inline-block;user-select:all}
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-size:.8125rem;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+footer a{color:var(--muted)}

@@ -8,6 +8,24 @@
 <meta name="color-scheme" content="light dark">
 <title>Wayleaf</title>
 <meta name="application-name" content="Wayleaf">
+<!-- SNSでシェアしたときの見た目（独自のURLにしたら og:url と og:image のURLも変える） -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Wayleaf">
+<meta property="og:title" content="Wayleaf — 行き先を入れるだけで、AIが旅のしおりを作る">
+<meta property="og:description" content="見どころの写真・日ごとの予定・ごはん屋さん・地図まで。航空券の時間に合わせたプランも作れます。">
+<meta property="og:url" content="https://tabi-shiori-ai.vercel.app/">
+<meta property="og:image" content="https://tabi-shiori-ai.vercel.app/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<!-- ホーム画面に追加したとき -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Wayleaf">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23D8A75E%22/%3E%3Cstop offset=%221%22 stop-color=%22%239C6630%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22url(%23g)%22/%3E%3Cpath d=%22M9 23C9 14 15 8 24 8c0 9-6 15-15 15z%22 fill=%22%23fff%22/%3E%3Cpath d=%22M9.5 22.5l8.5-8.5%22 stroke=%22%23B07A3E%22 stroke-width=%221.6%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
 <meta name="description" content="Wayleaf（ウェイリーフ）｜行き先を入れるだけで、見どころの写真・日ごとの予定・ごはん屋さんまで入った旅行プランをAIが作ります。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -463,6 +481,31 @@ input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local
 /* 地図の番号ピン */
 .mk,.plist .num{font-family:var(--f-mono)}
 @media (prefers-contrast:more){.t{background-image:none}}
+
+/* サイト下の規約リンク */
+.legal{max-width:1000px;margin:56px auto 0;padding-top:18px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8125rem;color:var(--muted)}
+.legal a{color:var(--muted);text-decoration:none}
+.legal a:hover{color:var(--ink);text-decoration:underline}
+.legal span:last-child{flex-basis:100%}
+
+/* 泊まる場所のおすすめ（PR） */
+.prtag{font-family:var(--f-mono);font-size:.75rem;font-weight:500;letter-spacing:.1em;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 8px}
+.stayarea{margin:0 0 14px;font-size:1rem;line-height:1.7}
+.stayarea b{font-weight:700}
+.hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.hotel{background:var(--soft);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.himg{aspect-ratio:16/10;max-width:100%;background:var(--ph-a);overflow:hidden}
+.himg img{width:100%;height:100%;object-fit:cover}
+.hbody2{padding:14px 16px 16px;display:flex;flex-direction:column;gap:4px;flex:1}
+.hbody2 h4{margin:0;font-size:1.0625rem;font-weight:600;line-height:1.4}
+.hmeta{margin:0;font-size:.8125rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px}
+.hmeta .star{color:var(--accent-ink);font-weight:600}
+.hprice{margin:4px 0 0;font-weight:700;font-size:1.125rem;font-variant-numeric:tabular-nums}
+.hprice small{font-size:.75rem;font-weight:500;color:var(--muted);margin-left:4px}
+.hotel .actions{margin-top:auto;padding-top:10px}
+.hlinks{align-items:center}
+.prnote{margin:12px 0 0;font-size:.75rem;color:var(--muted);line-height:1.6}
+.prnote a{color:var(--muted)}
 </style>
 <script>document.documentElement.classList.add("js")</script>
 </head>
@@ -521,6 +564,12 @@ input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local
 
   <main class="sheet gutter" id="plan" tabindex="-1">
     <div class="inner" id="inner"></div>
+    <footer class="legal">
+      <span>© Wayleaf</span>
+      <a href="/terms.html">利用規約</a>
+      <a href="/privacy.html">プライバシーポリシー</a>
+      <span>プランはAIが作る案です。お出かけ前に公式の情報を確認してね。</span>
+    </footer>
   </main>
 </div>
 <button class="back off" id="back" type="button">条件を変える ↑</button>
@@ -1054,6 +1103,7 @@ input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local
             <p>${esc(h.feature)}</p>
           </article>`).join("")}</div>
       </section>`:""}
+      ${stayHTML(p, rv)}
       ${days.map((dy,di)=>dayHTML(dy,di,rv)).join("")}
       <div class="extras${rv}">
         ${budget.length?`<div class="box"><h3>予算のめやす（1人）</h3><table class="btable">${budget.map((b,i)=>`<tr class="${i===budget.length-1&&/合計/.test(b.item)?"total":""}"><td>${esc(b.item)}</td><td>${esc(b.amount)}</td></tr>`).join("")}</table></div>`:""}
@@ -1062,8 +1112,65 @@ input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local
       </div>
       <p class="note">お店の営業日・予約の有無は、行く前に地図やお店のページで確認してね。</p>`;
     loadPhotos($("#inner"));
+    loadHotels();
     if (reveal) watchReveal($("#inner"));
   }
+
+  // ---------- 泊まる場所のおすすめ（PR・アフィリエイト） ----------
+  // ホテルが決まっていないときだけ、AIが選んだ「泊まるエリア」と、そのエリアのホテルを出す
+  const yen = n => (Number(n) > 0 ? "¥" + Number(n).toLocaleString("ja-JP") : "");
+  function stayHTML(p, rv=""){
+    if (!p.stay || !p.stay.area || (p.conds && String(p.conds.hotel || "").trim())) return "";
+    return `<section class="stay${rv}" id="stay">
+        <div class="secthead"><h3>泊まる場所のおすすめ</h3><span class="prtag">PR</span></div>
+        <p class="stayarea"><b>${esc(p.stay.area)}</b>${p.stay.why ? `　${esc(p.stay.why)}` : ""}</p>
+        <div class="hotels" id="hotelList">${hotelsInner(p.stayHotels)}</div>
+        <p class="prnote">このコーナーには広告（アフィリエイトリンク）が含まれます。リンク先で予約されると、Wayleafに紹介料が入ることがあります。${p.stayHotels && p.stayHotels.source === "rakuten" && p.stayHotels.hotels.length ? `　<a href="https://webservice.rakuten.co.jp/" target="_blank" rel="noopener">Supported by Rakuten Developers</a>` : ""}</p>
+      </section>`;
+  }
+  function hotelsInner(h){
+    if (!h) return `<div class="dayload" role="status"><span><span class="spin"></span>このエリアのホテルを探しています…</span><i></i><i></i></div>`;
+    const cards = (h.hotels || []).map((x, i) => `<article class="hotel">
+        ${x.image ? `<div class="himg"><img src="${esc(x.image)}" alt="${esc(x.name)}" loading="lazy" referrerpolicy="no-referrer"></div>` : ""}
+        <div class="hbody2">
+          <h4>${esc(x.name)}</h4>
+          <p class="hmeta">${x.review ? `<span class="star">★ ${esc(Number(x.review).toFixed(1))}</span><span>（${esc(x.reviewCount || 0)}件）</span>` : ""}${x.station ? `<span>${esc(x.station)}駅</span>` : ""}</p>
+          ${x.minCharge ? `<p class="hprice">${yen(x.minCharge)}〜<small>／1泊1室の目安（税込）</small></p>` : ""}
+          <div class="actions">
+            <a class="btn primary" href="${esc(x.url)}" target="_blank" rel="sponsored noopener">楽天トラベルで見る</a>
+            <button class="btn" type="button" data-usehotel="${i}">このホテルにする</button>
+          </div>
+        </div>
+      </article>`).join("");
+    const links = (h.links || []).map(l => `<a class="btn" href="${esc(l.url)}" target="_blank" rel="${l.sponsored ? "sponsored " : ""}noopener">${esc(l.label)} ↗</a>`).join("");
+    return (cards ? `<div class="hgrid">${cards}</div>` : "") + (links ? `<div class="actions hlinks">${cards ? "" : "<span class=\"mapnote\">予約サイトで、このエリアのホテルを探せます。</span>"}${links}</div>` : "");
+  }
+  let hotelToken = 0;
+  async function loadHotels(){
+    const p = plan;
+    if (!p || !p.stay || !p.stay.area || p.stayHotels || (p.conds && String(p.conds.hotel || "").trim())) return;
+    const my = ++hotelToken;
+    let data = {hotels: [], links: []};
+    try {
+      const q = new URLSearchParams({keyword: p.stay.keyword || p.stay.area, area: p.stay.area, city: p.stay.city || dest, domestic: p.stay.domestic === false ? "0" : "1"});
+      const r = await fetch("/api/hotels?" + q);
+      if (r.ok) data = await r.json();
+    } catch {}
+    if (my !== hotelToken || p !== plan) return;
+    p.stayHotels = {hotels: data.hotels || [], links: data.links || [], source: data.source || null};
+    const el = document.getElementById("stay");
+    if (el) { el.outerHTML = stayHTML(p); }
+    if (savedId) updateSaved();
+  }
+  $("#inner").addEventListener("click", e => {
+    const b = e.target.closest("[data-usehotel]"); if (!b || !plan?.stayHotels) return;
+    const h = plan.stayHotels.hotels[Number(b.dataset.usehotel)]; if (!h) return;
+    $("#hotel").value = h.name;
+    $("details.more-opts").open = true;
+    buzz();
+    window.scrollTo({top: 0, behavior: reduced ? "auto" : "smooth"});
+    status(`「${h.name}」を泊まるホテルに入れました。「この条件でプランを作る」で、このホテルを拠点にした予定に作り直せます。`);
+  });
 
   function dayHTML(dy, di, rv=""){
     let body;
@@ -1505,8 +1612,23 @@ input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local
   const status = (t, err) => { const s=$("#status"); s.textContent=t; s.classList.toggle("err",!!err); };
   let busy = false, conds = null, runId = 0;
 
+  // メモ・ホテル・航空券が入っていない「よくある条件」は、同じ条件の人と結果を使い回せる形（GET）で送る。
+  // 出発日は月だけにして、同じ月なら同じプランになるようにする。個人的な内容が入っているときは毎回AIに作ってもらう（POST）
+  function shareableUrl(body){
+    if (String(body.notes || "").trim() || String(body.hotel || "").trim() || body.flight) return null;
+    const q = new URLSearchParams();
+    const keys = ["mode","dest","days","people","budget","pace","from","gender","age","dayIndex"];
+    for (const k of keys) if (body[k] !== undefined && body[k] !== null && body[k] !== "") q.set(k, String(body[k]).trim());
+    if (body.start) q.set("start", String(body.start).slice(0,7));
+    if (Array.isArray(body.interests) && body.interests.length) q.set("interests", [...body.interests].sort().join(","));
+    if (body.outline) q.set("outline", JSON.stringify(body.outline));
+    const url = "/api/plan?" + q.toString();
+    return url.length < 12000 ? url : null;  // 長すぎるURLはサーバーが受け取れないので POST に
+  }
   async function postPlan(body){
-    const r = await fetch("/api/plan", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+    const shareUrl = shareableUrl(body);
+    const r = shareUrl ? await fetch(shareUrl)
+      : await fetch("/api/plan", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
     const raw = await r.text();
     let data = {}; try { data = JSON.parse(raw); } catch {}
     if (!r.ok) {

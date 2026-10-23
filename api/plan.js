@@ -1,3 +1,4 @@
+import { sameSite, allow } from "./_guard.js";
 // Wayleaf — プランを作るサーバー側の処理（Vercel のサーバーレス関数）
 // APIキーはブラウザに出さず、ここ（サーバー）だけで使います。
 //
@@ -13,6 +14,15 @@ const MODELS = [
   "gemini-3.6-flash",
   "gemini-flash-latest",
   "gemini-3.5-flash-lite",
+].filter((m, i, a) => m && a.indexOf(m) === i);
+
+// 1日ごとの細かい予定は、安いモデル（Flash-Lite）を先に使う。混んでいたら上のモデルへ
+// （Vercel の環境変数 GEMINI_DAY_MODEL でモデルを変えられる）
+const DAY_MODELS = [
+  process.env.GEMINI_DAY_MODEL,
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
+  ...MODELS,
 ].filter((m, i, a) => m && a.indexOf(m) === i);
 
 const clip = (v, n) => String(v ?? "").slice(0, n).trim();
@@ -60,7 +70,7 @@ function conditions(b) {
 - 着くのが夜なら、1日目は夕食とホテルだけでよい。早朝なら、まずホテルに荷物を預けてから動く。` : ""}${ret ? `
 - 最終日は、帰りの便（${ret.from} ${dt(ret.dep)} 発）に間に合うように終える。国際線は出発の3時間前、国内線は1.5時間前までに空港に着くように、空港までの移動時間も考える。最後の予定は空港への移動・出発にする。` : ""}`;
   const perDay = pace === "ぎっしり" ? "4〜6" : pace === "のんびり" ? "2〜3" : "3〜4";
-  return { n, pace, perDay, text, gender, age };
+  return { n, pace, perDay, text, gender, age, hotel };
 }
 
 const GENDERS = ["女性", "男性", "男女ミックス"];
@@ -89,13 +99,15 @@ ${c.text}
 - 各日に、まわるエリア(area)、その日の流れ(flow：1〜2文。初日は出発地から着く時間、最終日は帰る時間も意識する)、主な観光スポット(spots：実在の名前を ${c.perDay} 個)を割り当てる。
 - 日ごとにエリアを分けて、移動が少なくなるようにする。同じスポットを2日に入れない。
 - destWiki: 行き先の日本語版Wikipediaの記事名（例 "京都市"）。destEn: 英語名。
-- highlights: 行き先を代表する有名な場所・景色がきれいな場所を6つ。name は正式な名前、feature は見た目の特徴や魅力を1文、wiki は日本語版Wikipediaの記事名、en は英語名、lat/lng はおおよその緯度経度（わからなければ null）。
+- highlights: 行き先を代表する有名な場所・景色がきれいな場所を6つ。name は正式な名前、feature は見た目の特徴や魅力を1文、wiki は日本語版Wikipediaの記事名、en は英語名、lat/lng はおおよその緯度経度（わからなければ null）。${c.hotel ? "" : `
+- stay: 泊まるホテルが決まっていないので、この旅に一番合う「泊まるエリア」を1つ提案する。area は「四条河原町周辺」のような名前、why はそこをすすめる理由（各日のエリアへの行きやすさなど）を1文、keyword はホテル検索に使う2〜10文字の地名（例 "四条河原町"、"新宿"）、city はその都市名、domestic は行き先が日本国内なら true・海外なら false、lat/lng はおおよその緯度経度。`}
 
 JSONだけで答えてください。形式:
 {"title":"旅のタイトル","summary":"2〜3文の概要","destWiki":"","destEn":"",
 "meta":[{"label":"出発","value":"..."},{"label":"人数","value":"..."},{"label":"ペース","value":"..."}],
 "highlights":[{"name":"","feature":"","wiki":"","en":"","lat":35.0,"lng":135.7}],
-"days":[{"label":"1日目","theme":"その日のテーマ","area":"","flow":"","spots":[""]}],
+"days":[{"label":"1日目","theme":"その日のテーマ","area":"","flow":"","spots":[""]}],${c.hotel ? "" : `
+"stay":{"area":"","why":"","keyword":"","city":"","domestic":true,"lat":35.0,"lng":135.7},`}
 "budget":[{"item":"交通","amount":"¥..."},{"item":"合計","amount":"約¥..."}],
 "tips":["旅のコツを3つ"],"packing":["持ち物を3〜5個"]}
 days は必ず ${c.n} 日分。budget の最後は合計。`;
@@ -184,10 +196,10 @@ function parseJson(text) {
 }
 
 // 混んでいるモデルは飛ばしながら、JSONの答えをもらう
-async function generate(prompt, key, isValid) {
+async function generate(prompt, key, isValid, models = MODELS) {
   const started = Date.now();
   let status = 0, data = {}, busy = false;
-  for (const model of MODELS) {
+  for (const model of models) {
     if (Date.now() - started > 150000) break; // 次のモデルを試すと上限(300秒)に間に合わないので打ち切り
     ({ status, data } = await callGemini(model, prompt, key));
     if (status === 200) {
@@ -208,21 +220,46 @@ async function generate(prompt, key, isValid) {
 }
 
 // ---------- 入口 ----------
+
+// GET で来たリクエスト（メモ・ホテル・航空券なしの「よくある条件」）の中身を取り出す
+function fromQuery(q) {
+  const b = { ...q };
+  b.interests = q.interests ? String(q.interests).split(",").filter(Boolean) : [];
+  if (q.outline) b.outline = parseJson(String(q.outline)) || {};
+  delete b.notes; delete b.hotel; delete b.flight;  // 個人的な内容は GET では受け付けない
+  return b;
+}
+
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "POSTで送ってください。" });
+  // 失敗した答えは保存しない
+  res.setHeader("Cache-Control", "no-store");
+  const isGet = req.method === "GET";
+  if (!isGet && req.method !== "POST") return res.status(405).json({ error: "使えない呼び出し方です。" });
+  // ほかのサイトやツールからの呼び出しは断る
+  if (!sameSite(req)) return res.status(403).json({ error: "Wayleafの画面から使ってね。" });
   const key = process.env.GEMINI_API_KEY;
   if (!key) return res.status(500).json({ error: "サーバーにGEMINI_API_KEYが設定されていません。" });
 
-  const body = typeof req.body === "string" ? (parseJson(req.body) || {}) : (req.body || {});
+  const body = isGet ? fromQuery(req.query || {}) : (typeof req.body === "string" ? (parseJson(req.body) || {}) : (req.body || {}));
+  // 同じ条件の人が来たら、Vercel の配信網に保存した答えをそのまま返す（AI代0円）。7日間
+  const share = () => { if (isGet) res.setHeader("Cache-Control", "public, s-maxage=604800, stale-while-revalidate=2592000"); };
   if (!clip(body.dest, 60)) return res.status(400).json({ error: "行き先を入れてね。" });
+
+  // 使いすぎ防止：プランは10分に6回・1日30回まで。1日ごとの予定づくりは10分に60回まで
+  const ok = body.mode === "day"
+    ? allow(req, "day", [{ windowMs: 10 * 60e3, max: 60 }])
+    : allow(req, "plan", [{ windowMs: 10 * 60e3, max: 6 }, { windowMs: 24 * 3600e3, max: 30 }]);
+  if (!ok) return res.status(429).json({ error: "短い時間にたくさん作りすぎたみたい。少し時間をおいてから試してね。" });
 
   try {
     if (body.mode === "day") {
       const o = slimOutline(body.outline);
       const i = parseInt(body.dayIndex, 10);
       if (!o.days.length || !(i >= 0 && i < o.days.length)) return res.status(400).json({ error: "日にちの指定が正しくありません。" });
-      const r = await generate(dayPrompt(body, body.outline, i), key, j => Array.isArray(j.items));
-      return r.ok ? res.status(200).json({ items: r.json.items }) : res.status(r.code).json(r.body);
+      const r = await generate(dayPrompt(body, body.outline, i), key, j => Array.isArray(j.items), DAY_MODELS);
+      if (!r.ok) return res.status(r.code).json(r.body);
+      share();
+      return res.status(200).json({ items: r.json.items });
     }
     // それ以外は骨組み
     const { n } = conditions(body);
@@ -230,6 +267,7 @@ export default async function handler(req, res) {
     if (!r.ok) return res.status(r.code).json(r.body);
     const o = r.json;
     o.days = o.days.slice(0, n);
+    share();
     return res.status(200).json(o);
   } catch (e) {
     return res.status(500).json({ error: "通信に失敗しました。もう一度試してね。" });
