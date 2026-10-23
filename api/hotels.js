@@ -88,7 +88,7 @@ export default async function handler(req, res) {
     // ホテルの料金は変わるので、使い回しは6時間まで
     res.setHeader("Cache-Control", "public, s-maxage=21600, stale-while-revalidate=86400");
     return res.status(200).json({ hotels, links, source: "rakuten", affiliate: !!affiliateId });
-  } catch {
-    return res.status(200).json({ hotels: [], links, source: "rakuten", note: "fetch_failed" });
+  } catch (e) {
+    return res.status(200).json({ hotels: [], links, source: "rakuten", note: "fetch_failed: " + String(e?.cause?.code || e?.message || e).slice(0, 120) });
   }
 }
